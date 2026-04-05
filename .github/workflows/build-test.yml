@@ -57,6 +57,10 @@ jobs:
       - name: Test
         run: dotnet test Scribe.slnx --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
 
+      - name: Pack
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: dotnet pack Scribe.slnx --configuration Release --no-build --output .artifacts/packages
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
