@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# commit-msg hook — enforces Conventional Commits format.
+#
+# Format: <type>(<scope>): <subject>
+#         <type>: <subject>
+#
+# Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# Allowed scopes (optional): scribe, docs, ci, deps
+#
+# Install: copy or symlink to .git/hooks/commit-msg
+#          or use: git config core.hooksPath .githooks
+
+MSG_FILE="$1"
+MSG=$(head -1 "$MSG_FILE")
+
+# Pattern: type(scope): subject  OR  type: subject  OR  type!: subject (breaking change)
+PATTERN="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: .{1,100}$"
+
+if ! echo "$MSG" | grep -qE "$PATTERN"; then
+  echo ""
+  echo "ERROR: Commit message does not follow Conventional Commits format."
+  echo ""
+  echo "  Expected:  <type>(<scope>): <subject>"
+  echo "  Got:       $MSG"
+  echo ""
+  echo "  Allowed types:  feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+  echo "  Allowed scopes: scribe, docs, ci, deps (optional)"
+  echo ""
+  echo "  Examples:"
+  echo "    feat(scribe): add new quill builder method"
+  echo "    fix(scribe): correct indentation in generated output"
+  echo "    docs: update README quick start"
+  echo "    chore(deps): bump roslyn sdk to 5.1.0"
+  echo ""
+  exit 1
+fi

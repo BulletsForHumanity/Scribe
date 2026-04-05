@@ -1,0 +1,16 @@
+# Scribe repository attributes
+
+# Ensure hooks are executable on checkout
+.githooks/* eol=lf
+
+# Normalize line endings
+* text=auto
+*.cs text diff=csharp
+*.csproj text
+*.slnx text
+*.md text
+*.json text
+*.yml text
+*.xml text
+*.props text
+*.targets text

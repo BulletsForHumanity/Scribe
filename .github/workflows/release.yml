@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run — validate packages without pushing to NuGet'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: write   # for creating GitHub releases and tags
+  actions: read     # for downloading artifacts from other workflow runs
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Opt into Node.js 24 for all JS-based actions (checkout, setup-dotnet, upload-artifact).
+  # Node.js 20 becomes the default on 2026-06-02 and is removed on 2026-09-16.
+  # Remove this flag once the actions used above ship a release that natively targets Node.js 24
+  # (watch actions/checkout, actions/setup-dotnet, actions/upload-artifact for a v4.x.x bump).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    name: Publish
+    runs-on: ubuntu-latest
+    # Only allow release from master
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for Nerdbank.GitVersioning
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Download packages from latest build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Find the latest successful Build & Test run on master for this commit
+          RUN_JSON=$(gh run list \
+            --workflow "Build & Test" \
+            --branch master \
+            --status success \
+            --limit 1 \
+            --json databaseId,headSha)
+
+          RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId')
+          RUN_SHA=$(echo "$RUN_JSON" | jq -r '.[0].headSha')
+          HEAD_SHA=$(git rev-parse HEAD)
+
+          echo "Latest successful build run: $RUN_ID (commit $RUN_SHA)"
+          echo "Current HEAD: $HEAD_SHA"
+
+          if [ "$RUN_SHA" != "$HEAD_SHA" ]; then
+            echo "::error::Artifact commit ($RUN_SHA) does not match current HEAD ($HEAD_SHA). Run Build & Test on master first."
+            exit 1
+          fi
+
+          gh run download "$RUN_ID" --name packages --dir .artifacts/packages
+
+      - name: List downloaded packages
+        run: ls -la .artifacts/packages/
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION=$(dotnet nbgv get-version --variable NuGetPackageVersion)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "### 📦 Version: $VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push to NuGet
+        if: inputs.dry-run != 'true'
+        continue-on-error: true
+        run: |
+          dotnet nuget push ".artifacts/packages/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --skip-duplicate
+          dotnet nuget push ".artifacts/packages/*.snupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --skip-duplicate
+
+      - name: Generate release notes
+        if: inputs.dry-run != 'true'
+        id: notes
+        run: |
+          # Get the previous tag (if any)
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+
+          # Extract conventional commit messages for release notes
+          NOTES=$(git log $RANGE --pretty=format:"- %s" --no-merges | head -50)
+          if [ -z "$NOTES" ]; then
+            NOTES="- Initial release"
+          fi
+
+          # Write to file for the release step
+          {
+            echo "## What's Changed"
+            echo ""
+            echo "$NOTES"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Full Changelog:** https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${{ steps.version.outputs.version }}"
+          } > release-notes.md
+
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub Release
+        if: inputs.dry-run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --notes-file release-notes.md \
+            .artifacts/packages/*.nupkg \
+            .artifacts/packages/*.snupkg
+
+      - name: Dry run summary
+        if: inputs.dry-run == 'true'
+        run: |
+          echo "### 🧪 Dry Run Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "Packages built but NOT pushed to NuGet." >> "$GITHUB_STEP_SUMMARY"
+          echo "Version: ${{ steps.version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          ls -la .artifacts/packages/ >> "$GITHUB_STEP_SUMMARY"

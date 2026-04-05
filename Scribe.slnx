@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Scribe/Scribe.csproj" />
+  <Project Path="Scribe.Tests/Scribe.Tests.csproj" />
+</Solution>

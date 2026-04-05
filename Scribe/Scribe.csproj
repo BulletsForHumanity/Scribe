@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework />
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <LangVersion>14</LangVersion>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IncludeSourceGeneratorAttributes>false</IncludeSourceGeneratorAttributes>
+    <!--
+        Scribe is a class library consumed by analyzer projects.
+        It is NOT an analyzer itself — it provides shared source-generation utilities.
+        IncludeBuildOutput=false: Scribe's DLL is bundled into consuming analyzer packages
+        via CopyLocalLockFileAssemblies, not shipped as a standalone lib/ assembly.
+    -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- Embed PDB directly so IDE tooling can step through Scribe source. -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <DebugType>embedded</DebugType>
+    <!-- NU5128: no DLL in lib/ — expected, Scribe is bundled into analyzer packages. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- Disable doc XML file — Scribe is bundled into analyzer assemblies, not consumed directly.
+         The .xml file would otherwise be picked up as metadata by downstream references. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <PackageId>BulletsForHumanity.Scribe</PackageId>
+    <Description>Fluent source-generation utilities for Roslyn incremental generators. Provides Quill (fluent source builder), naming helpers, XML doc extraction, and well-known BCL type constants.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Scribe.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="" />
+    <None Include="..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

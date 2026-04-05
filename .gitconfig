@@ -1,0 +1,37 @@
+[core]
+    # Handle line endings automatically
+    autocrlf = input
+    # Use UTF-8 encoding
+    quotepath = false
+    # Enable long path support on Windows
+    longpaths = true
+
+[pull]
+    # Use rebase instead of merge when pulling
+    rebase = true
+
+[rebase]
+    # Automatically stash and unstash changes when rebasing
+    autostash = true
+
+[fetch]
+    # Automatically prune remote-tracking branches that no longer exist
+    prune = true
+
+[rerere]
+    # Enable rerere (reuse recorded resolution) for merge conflicts
+    enabled = true
+
+[push]
+    # Automatically set up tracking for new branches
+    autoSetupRemote = true
+
+[merge]
+    # Include common ancestor in conflict markers for better context
+    conflictstyle = diff3
+
+[diff]
+    # Use more readable diff algorithm
+    algorithm = histogram
+    # Show renames and copies
+    renames = copies

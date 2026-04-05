@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+.artifacts/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# Rider
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Test results
+TestResults/
+*.trx
+
+# Nerdbank.GitVersioning
+nbgv.json
+
+# Lock files (restore fresh)
+packages.lock.json
