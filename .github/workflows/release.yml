@@ -85,10 +85,6 @@ jobs:
             --source https://api.nuget.org/v3/index.json \
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --skip-duplicate
-          dotnet nuget push ".artifacts/packages/*.snupkg" \
-            --source https://api.nuget.org/v3/index.json \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
-            --skip-duplicate
 
       - name: Generate release notes
         if: inputs.dry-run != 'true'
@@ -129,8 +125,7 @@ jobs:
           gh release create "v${{ steps.version.outputs.version }}" \
             --title "v${{ steps.version.outputs.version }}" \
             --notes-file release-notes.md \
-            .artifacts/packages/*.nupkg \
-            .artifacts/packages/*.snupkg
+            .artifacts/packages/*.nupkg
 
       - name: Dry run summary
         if: inputs.dry-run == 'true'

@@ -31,6 +31,19 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.*.props
+            **/Directory.*.targets
+
+      - name: Cache dotnet tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.dotnet/tools
+          key: ${{ runner.os }}-dotnet-tools-${{ hashFiles('.config/dotnet-tools.json') }}
+          restore-keys: |
+            ${{ runner.os }}-dotnet-tools-
 
       - name: Restore tools
         run: dotnet tool restore
@@ -42,7 +55,6 @@ jobs:
         run: dotnet build Scribe.slnx --configuration Release --no-restore
 
       - name: Test
-        continue-on-error: true
         run: dotnet test Scribe.slnx --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
 
       - name: Upload test results
@@ -53,10 +65,8 @@ jobs:
           path: "**/test-results.trx"
 
       - name: Upload packages
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: packages
-          path: |
-            .artifacts/packages/*.nupkg
-            .artifacts/packages/*.snupkg
+          path: .artifacts/packages/*.nupkg

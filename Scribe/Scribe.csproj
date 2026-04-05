@@ -8,10 +8,9 @@
     <!--
         Scribe is a class library consumed by analyzer projects.
         It is NOT an analyzer itself — it provides shared source-generation utilities.
-        IncludeBuildOutput=false: Scribe's DLL is bundled into consuming analyzer packages
-        via CopyLocalLockFileAssemblies, not shipped as a standalone lib/ assembly.
+        Consuming analyzer packages must bundle the Scribe DLL alongside their own output
+        (e.g. via CopyLocalLockFileAssemblies + custom packaging targets).
     -->
-    <IncludeBuildOutput>false</IncludeBuildOutput>
     <!-- Embed PDB directly so IDE tooling can step through Scribe source. -->
     <IncludeSymbols>false</IncludeSymbols>
     <DebugType>embedded</DebugType>
@@ -31,6 +30,14 @@
   <ItemGroup>
     <None Include="..\LICENSE" Pack="true" PackagePath="" />
     <None Include="..\README.md" Pack="true" PackagePath="" />
+    <!-- Ship LocalDev build infrastructure so consumers get it via NuGet.
+         The BulletsForHumanity.Scribe.* wrappers are the NuGet auto-import entry points.
+         The Scribe.LocalDev.* files contain the actual logic and are also importable
+         directly from a sibling repo checkout. -->
+    <None Include="build\BulletsForHumanity.Scribe.props" Pack="true" PackagePath="build" />
+    <None Include="build\BulletsForHumanity.Scribe.targets" Pack="true" PackagePath="build" />
+    <None Include="build\Scribe.LocalDev.props" Pack="true" PackagePath="build" />
+    <None Include="build\Scribe.LocalDev.targets" Pack="true" PackagePath="build" />
   </ItemGroup>
 
   <ItemGroup>
