@@ -560,11 +560,16 @@ public sealed class QuillTests
     }
 
     // ── Global Reference Resolution ────────────────────────────────────
+    //
+    // ResolveGlobalReferences only shortens global:: references whose namespace
+    // is already registered via Using()/Usings(). Unregistered global:: refs
+    // stay as-is — the generator author must register the namespaces they need.
 
     [Fact]
     public void Global_ResolvesGlobalRefs_ToShortNames()
     {
         var q = new Quill();
+        q.Using("System.Collections.Generic");
         q.Line("var x = new global::System.Collections.Generic.List<int>();");
         var result = q.Inscribe();
 
@@ -577,6 +582,7 @@ public sealed class QuillTests
     public void Global_ResolvesMultipleDistinctRefs()
     {
         var q = new Quill();
+        q.Usings("System", "System.Text.Json");
         q.Line("global::System.Guid id = default;");
         q.Line("global::System.Text.Json.JsonSerializer.Serialize(id);");
         var result = q.Inscribe();
@@ -589,37 +595,21 @@ public sealed class QuillTests
     }
 
     [Fact]
-    public void Global_ConflictingTypeNames_CreatesAliases()
+    public void Global_UnregisteredNamespace_StaysAsIs()
     {
         var q = new Quill();
-        q.Line("global::Foo.Bar.Widget w1 = default;");
-        q.Line("global::Baz.Qux.Widget w2 = default;");
+        // No Using() call — global:: should stay
+        q.Line("global::Foo.Bar.Widget w = default;");
         var result = q.Inscribe();
 
-        result.ShouldNotContain("global::");
-        result.ShouldContain("BarWidget w1 = default;");
-        result.ShouldContain("QuxWidget w2 = default;");
-        result.ShouldContain("using BarWidget = Foo.Bar.Widget;");
-        result.ShouldContain("using QuxWidget = Baz.Qux.Widget;");
-    }
-
-    [Fact]
-    public void Global_ConflictingTypeNames_WalksUpNamespace_UntilUnique()
-    {
-        var q = new Quill();
-        q.Line("global::A.Utils.Helper h1 = default;");
-        q.Line("global::B.Utils.Helper h2 = default;");
-        var result = q.Inscribe();
-
-        result.ShouldNotContain("global::");
-        result.ShouldContain("AUtilsHelper h1 = default;");
-        result.ShouldContain("BUtilsHelper h2 = default;");
+        result.ShouldContain("global::Foo.Bar.Widget w = default;");
     }
 
     [Fact]
     public void Global_DeduplicatesSameTypeUsedMultipleTimes()
     {
         var q = new Quill();
+        q.Using("System");
         q.Line("global::System.Guid a = default;");
         q.Line("global::System.Guid b = default;");
         var result = q.Inscribe();
@@ -636,7 +626,7 @@ public sealed class QuillTests
     public void Global_PreservesManualUsings_AlongsideResolved()
     {
         var q = new Quill();
-        q.Using("System.Linq");
+        q.Usings("System", "System.Linq");
         q.Line("global::System.Guid id = default;");
         var result = q.Inscribe();
 
@@ -657,36 +647,37 @@ public sealed class QuillTests
     }
 
     [Fact]
-    public void Global_MultipleRefsResolved_WithoutRegistration()
+    public void Global_MemberAccess_ResolvedCorrectlyWithUsing()
     {
+        // global::System.Globalization.CultureInfo.InvariantCulture — CultureInfo is a type,
+        // InvariantCulture is a static property. With "System.Globalization" registered,
+        // the global:: prefix is stripped and the remainder is CultureInfo.InvariantCulture.
         var q = new Quill();
-        q.Line("global::System.Guid id = default;");
-        q.Line("global::System.Text.Json.JsonSerializer.Serialize(id);");
+        q.Using("System.Globalization");
+        q.Line("var c = global::System.Globalization.CultureInfo.InvariantCulture;");
         var result = q.Inscribe();
 
-        result.ShouldContain("using System;");
-        result.ShouldContain("using System.Text.Json;");
+        result.ShouldContain("using System.Globalization;");
+        result.ShouldContain("var c = CultureInfo.InvariantCulture;");
         result.ShouldNotContain("global::");
     }
 
     [Fact]
-    public void Global_MemberAccess_UseUsingForChainedAccess()
+    public void Global_MemberAccess_WithoutUsing_StaysAsIs()
     {
-        // Auto-discovery can't distinguish type boundaries from member access chains.
-        // For global::Type.Property.Method(...) patterns, use Using() + short type name instead.
+        // Without a registered using, global:: stays — no guessing.
         var q = new Quill();
-        q.Using("System");
-        q.Line("return StringComparer.Ordinal.GetHashCode(Key);");
+        q.Line("var c = global::System.Globalization.CultureInfo.InvariantCulture;");
         var result = q.Inscribe();
 
-        result.ShouldContain("using System;");
-        result.ShouldContain("return StringComparer.Ordinal.GetHashCode(Key);");
+        result.ShouldContain("global::System.Globalization.CultureInfo.InvariantCulture");
     }
 
     [Fact]
     public void Global_InGenericTypeArgument_ResolvesCorrectly()
     {
         var q = new Quill();
+        q.Usings("System", "System.Collections.Generic");
         q.Line("var items = new global::System.Collections.Generic.List<global::System.Guid>();");
         var result = q.Inscribe();
 
@@ -700,6 +691,7 @@ public sealed class QuillTests
     public void Global_InNestedGenerics_ResolvesAll()
     {
         var q = new Quill();
+        q.Using("System.Collections.Generic");
         q.Line("var x = new global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.List<int>>();");
         var result = q.Inscribe();
 
@@ -712,6 +704,7 @@ public sealed class QuillTests
     public void Global_InInterfaceList_ResolvesCorrectly()
     {
         var q = new Quill();
+        q.Using("System");
         q.Line("public partial record Amount : global::System.IParsable<Amount>, global::System.IComparable<Amount>");
         var result = q.Inscribe();
 
@@ -726,6 +719,7 @@ public sealed class QuillTests
     public void Global_NullableType_ResolvesCorrectly()
     {
         var q = new Quill();
+        q.Using("System");
         q.Line("public static bool TryParse(string? s, global::System.IFormatProvider? provider, out Amount result)");
         var result = q.Inscribe();
 
@@ -738,6 +732,7 @@ public sealed class QuillTests
     public void Global_InConstructor_ResolvesCorrectly()
     {
         var q = new Quill();
+        q.Using("System");
         q.Line("throw new global::System.ArgumentException(\"bad\", nameof(value));");
         var result = q.Inscribe();
 
@@ -750,6 +745,7 @@ public sealed class QuillTests
     public void Global_InTypeof_ResolvesCorrectly()
     {
         var q = new Quill();
+        q.Using("System");
         q.Line("if (type == typeof(global::System.Guid))");
         var result = q.Inscribe();
 
@@ -761,6 +757,7 @@ public sealed class QuillTests
     public void Global_SameNamespaceMultipleTypes_SingleUsing()
     {
         var q = new Quill();
+        q.Using("System");
         q.Line("global::System.Guid id = default;");
         q.Line("throw new global::System.ArgumentException(\"bad\");");
         q.Line("global::System.IntPtr ptr = default;");
@@ -773,50 +770,28 @@ public sealed class QuillTests
     }
 
     [Fact]
-    public void Global_ThreeWayConflict_DisambiguatesAll()
+    public void Global_LongestNamespaceMatchWins()
     {
+        // When both "System" and "System.Text.Json" are registered,
+        // "global::System.Text.Json.JsonSerializer" should match the longer namespace.
         var q = new Quill();
-        q.Line("global::A.X.Config a = default;");
-        q.Line("global::B.Y.Config b = default;");
-        q.Line("global::C.Z.Config c = default;");
+        q.Usings("System", "System.Text.Json");
+        q.Line("global::System.Text.Json.JsonSerializer.Serialize(id);");
         var result = q.Inscribe();
 
+        result.ShouldContain("JsonSerializer.Serialize(id);");
+        // Should NOT produce "Text.Json.JsonSerializer" from matching "System" only
+        result.ShouldNotContain("Text.Json.JsonSerializer");
         result.ShouldNotContain("global::");
-        // All three should have unique aliases
-        result.ShouldContain("XConfig a = default;");
-        result.ShouldContain("YConfig b = default;");
-        result.ShouldContain("ZConfig c = default;");
-        result.ShouldContain("using XConfig = A.X.Config;");
-        result.ShouldContain("using YConfig = B.Y.Config;");
-        result.ShouldContain("using ZConfig = C.Z.Config;");
-    }
-
-    [Fact]
-    public void Global_ConflictAndNonConflict_MixedCorrectly()
-    {
-        var q = new Quill();
-        q.Line("global::System.Guid id = default;");
-        q.Line("global::Foo.Widget a = default;");
-        q.Line("global::Bar.Widget b = default;");
-        var result = q.Inscribe();
-
-        result.ShouldNotContain("global::");
-        result.ShouldContain("using System;");
-        result.ShouldContain("Guid id = default;");
-        result.ShouldContain("FooWidget a = default;");
-        result.ShouldContain("BarWidget b = default;");
-        result.ShouldContain("using FooWidget = Foo.Widget;");
-        result.ShouldContain("using BarWidget = Bar.Widget;");
     }
 
     [Fact]
     public void Global_InMultiLineBlock_ResolvesAcrossLines()
     {
         var q = new Quill();
-        q.Using("System.Threading.Tasks");
+        q.Usings("System.Threading", "System.Threading.Tasks");
         using (q.Block("public global::System.Threading.Tasks.Task RunAsync(global::System.Threading.CancellationToken cancellationToken)"))
         {
-            // Use short name for member access chains (Task.CompletedTask)
             q.Line("return Task.CompletedTask;");
         }
 
@@ -830,24 +805,25 @@ public sealed class QuillTests
     }
 
     [Fact]
-    public void Global_WithStaticPropertyAccess_UseUsingForEnumMembers()
+    public void Global_WithStaticPropertyAccess_ResolvesWithRegisteredUsing()
     {
-        // global::System.StringComparison.Ordinal is ambiguous — the scanner can't tell
-        // that StringComparison is the type and Ordinal is the enum value.
-        // Use Using() + short name for these patterns.
+        // With the namespace registered, global::System.StringComparison.Ordinal
+        // correctly becomes StringComparison.Ordinal.
         var q = new Quill();
         q.Using("System");
-        q.Line("string.Equals(a, b, StringComparison.Ordinal);");
+        q.Line("string.Equals(a, b, global::System.StringComparison.Ordinal);");
         var result = q.Inscribe();
 
         result.ShouldContain("using System;");
         result.ShouldContain("string.Equals(a, b, StringComparison.Ordinal);");
+        result.ShouldNotContain("global::");
     }
 
     [Fact]
     public void Global_UsingsAreSorted()
     {
         var q = new Quill();
+        q.Usings("System", "System.Collections.Generic", "System.Threading.Tasks");
         q.Line("global::System.Threading.Tasks.Task t = default;");
         q.Line("global::System.Collections.Generic.List<int> l = default;");
         q.Line("global::System.Guid g = default;");
@@ -927,6 +903,7 @@ public sealed class QuillTests
     public void Alias_CoexistsWithGlobalResolution()
     {
         var q = new Quill();
+        q.Using("System");
         var w = q.Alias("Foo.Bar", "Widget", "FooWidget");
         q.Line($"{w} a = default;");
         q.Line("global::System.Guid id = default;");
@@ -945,6 +922,7 @@ public sealed class QuillTests
     public void FullIntegration_ProducesCorrectOutput()
     {
         var q = new Quill();
+        q.Using("System");
         q.FileNamespace("TestDomain");
 
         using (q.Block("public partial record Amount : global::System.IParsable<Amount>"))

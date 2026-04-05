@@ -1,25 +1,3 @@
 <Project>
-  <!--
-      On local (non-CI) builds, append -dev to the package version so locally produced
-      packages are never version-identical to NuGet.org releases.  The condition guards
-      against double-suffixing: NBGV already adds a git-hash pre-release tag on
-      non-public branches, so we only append -dev when the version is still clean.
-  -->
-  <Target
-    Name="AppendDevVersionSuffix"
-    AfterTargets="GetBuildVersion"
-    Condition="'$(IsLocalBuild)' == 'true' and '$(IsPackable)' != 'false'"
-  >
-    <PropertyGroup>
-      <!-- Timestamp gives a unique, always-incrementing counter per build without needing a counter file.
-           Format: yyyyMMddHHmmss — a valid SemVer2 numeric identifier that sorts chronologically. -->
-      <_DevBuildStamp>$([System.DateTime]::UtcNow.ToString("yyyyMMddHHmmss"))</_DevBuildStamp>
-      <PackageVersion Condition="!$(PackageVersion.Contains('-'))"
-        >$(PackageVersion)-dev.$(_DevBuildStamp)</PackageVersion
-      >
-      <NuGetPackageVersion Condition="!$(NuGetPackageVersion.Contains('-'))"
-        >$(NuGetPackageVersion)-dev.$(_DevBuildStamp)</NuGetPackageVersion
-      >
-    </PropertyGroup>
-  </Target>
+  <!-- Intentionally empty — stops MSBuild from walking up to parent directories. -->
 </Project>

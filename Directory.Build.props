@@ -5,12 +5,8 @@
        that builds and packs in isolation.
        ============================================================ -->
 
-  <PropertyGroup>
-    <IsLocalBuild>true</IsLocalBuild>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <IsLocalBuild>false</IsLocalBuild>
   </PropertyGroup>
 
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
@@ -55,17 +51,7 @@
        Version is managed by Nerdbank.GitVersioning (version.json).
        ============================================================ -->
   <PropertyGroup>
-    <!-- Pack on CI (all configs) or on an explicit local Release build.
-         Skip packing during local Debug to keep iteration fast. -->
-    <GeneratePackageOnBuild
-      Condition="'$(IsLocalBuild)' == 'false' or '$(Configuration)' == 'Release'"
-      >true</GeneratePackageOnBuild
-    >
-    <GeneratePackageOnBuild
-      Condition="'$(IsLocalBuild)' == 'true' and '$(Configuration)' != 'Release'"
-      >false</GeneratePackageOnBuild
-    >
-    <!-- Override the artifacts-computed package folder with a flat, well-known path. -->
+    <!-- CI uses explicit `dotnet pack` in the pipeline. No auto-pack needed. -->
     <PackageOutputPath>$(ArtifactsPath)packages/</PackageOutputPath>
     <Authors>Max Obrist</Authors>
     <Company>Bullets for Humanity</Company>
@@ -74,9 +60,6 @@
     <RepositoryUrl>https://github.com/BulletsForHumanity/Scribe</RepositoryUrl>
     <PackageProjectUrl>https://github.com/BulletsForHumanity/Scribe</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <!-- Symbols: produce a .snupkg alongside each .nupkg so consumers can step through source. -->
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <!-- SourceLink: embed a pointer to the exact commit on GitHub so debuggers can fetch source. -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
