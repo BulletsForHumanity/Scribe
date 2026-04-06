@@ -85,14 +85,15 @@ Scribe/build/
 1. **Generates a timestamp version** `0.0.0-dev.yyyyMMddHHmmss` — forces Visual Studio to reload analyzers on every build
 2. **Disables NBGV** (`NerdbankGitVersioningEnabled=false`) — version is managed by the SDK
 3. **Enables auto-pack** via `GeneratePackageOnBuild=true`
-4. **Redirects pack output** to `$(ArtifactsPath)packages/`
-5. **Registers as NuGet source** via `RestoreAdditionalProjectSources` (for the analyzer project itself)
+4. **Normalises `$(ArtifactsPath)`** to a guaranteed trailing separator (`_ScribeSaArtifactsDir`) for safe path concatenation
+5. **Redirects pack output** to `$(ArtifactsPath)packages/`
+6. **Registers as NuGet source** via `RestoreAdditionalProjectSources` (for the analyzer project itself)
 
 ### Targets Phase (Late)
 
 `Scribe.SolutionAnalyzer.targets` defines one target:
 
-**`_ScribeSolutionAnalyzerOverride`** — Runs after Pack. Generates a `.Directory.Packages.targets` file in `$(ArtifactsPath)` containing a `PackageVersion Update` entry:
+**`_ScribeSolutionAnalyzerOverride`** — Runs after Pack. Reads `$(NuGetPackageVersion)` (falling back to `$(PackageVersion)`) and generates a `.Directory.Packages.targets` file in `$(ArtifactsPath)` containing a `PackageVersion Update` entry:
 
 ```xml
 <Project>

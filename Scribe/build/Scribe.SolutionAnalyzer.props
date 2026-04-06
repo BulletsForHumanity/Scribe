@@ -66,14 +66,23 @@
     <NerdbankGitVersioningEnabled>false</NerdbankGitVersioningEnabled>
   </PropertyGroup>
 
+  <!-- ── Normalised Artifacts Directory ──────────────────────────────── -->
+  <!--
+      $(ArtifactsPath) may or may not end with a directory separator.
+      Normalise to a guaranteed trailing backslash so path concatenation is safe.
+  -->
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(ArtifactsPath)' != ''">
+    <_ScribeSaArtifactsDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))</_ScribeSaArtifactsDir>
+  </PropertyGroup>
+
   <!-- ── Package Output Directory ──────────────────────────────────────── -->
   <!--
       Outputs to $(ArtifactsPath)packages/ — the standard artifacts packages
       directory. Projects using artifact output (UseArtifactsOutput=true) have
       $(ArtifactsPath) set via Directory.Build.props.
   -->
-  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(ArtifactsPath)' != ''">
-    <PackageOutputPath>$(ArtifactsPath)packages\</PackageOutputPath>
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(_ScribeSaArtifactsDir)' != ''">
+    <PackageOutputPath>$(_ScribeSaArtifactsDir)packages\</PackageOutputPath>
   </PropertyGroup>
 
   <!-- ── NuGet Source Registration ─────────────────────────────────────── -->
@@ -82,9 +91,9 @@
       analyzer project itself (so it can resolve sibling solution-local packages).
       Consuming projects must register this source in Directory.Build.props.
   -->
-  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(ArtifactsPath)' != ''">
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(_ScribeSaArtifactsDir)' != ''">
     <RestoreAdditionalProjectSources>
-      $(RestoreAdditionalProjectSources);$(ArtifactsPath)packages
+      $(RestoreAdditionalProjectSources);$(_ScribeSaArtifactsDir)packages
     </RestoreAdditionalProjectSources>
   </PropertyGroup>
 </Project>

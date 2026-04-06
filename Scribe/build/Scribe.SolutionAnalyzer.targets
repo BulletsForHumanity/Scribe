@@ -28,8 +28,10 @@
                and '$(ArtifactsPath)' != ''"
   >
     <PropertyGroup>
-      <_ScribeSaVersion>$(PackageVersion)</_ScribeSaVersion>
-      <_ScribeSaOverridePath>$(ArtifactsPath)$(PackageId).Directory.Packages.targets</_ScribeSaOverridePath>
+      <_ScribeSaVersion>$(NuGetPackageVersion)</_ScribeSaVersion>
+      <_ScribeSaVersion Condition="'$(_ScribeSaVersion)' == ''">$(PackageVersion)</_ScribeSaVersion>
+      <_ScribeSaArtifactsDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))</_ScribeSaArtifactsDir>
+      <_ScribeSaOverridePath>$(_ScribeSaArtifactsDir)$(PackageId).Directory.Packages.targets</_ScribeSaOverridePath>
     </PropertyGroup>
 
     <ItemGroup>
@@ -41,7 +43,7 @@
       <_ScribeSaLine Include="&lt;/Project&gt;" />
     </ItemGroup>
 
-    <MakeDir Directories="$(ArtifactsPath)" />
+    <MakeDir Directories="$(_ScribeSaArtifactsDir)" />
     <WriteLinesToFile
       File="$(_ScribeSaOverridePath)"
       Lines="@(_ScribeSaLine)"
