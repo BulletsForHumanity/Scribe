@@ -38,6 +38,12 @@
     <None Include="..\Scribe\build\Scribe.LocalDev.targets" Pack="true" PackagePath="build" />
   </ItemGroup>
 
+  <!-- Pack the SolutionAnalyzer build infrastructure from the main Scribe project. -->
+  <ItemGroup>
+    <None Include="..\Scribe\build\Scribe.SolutionAnalyzer.props" Pack="true" PackagePath="build" />
+    <None Include="..\Scribe\build\Scribe.SolutionAnalyzer.targets" Pack="true" PackagePath="build" />
+  </ItemGroup>
+
   <!-- Pack LICENSE and README. -->
   <ItemGroup>
     <None Include="..\LICENSE" Pack="true" PackagePath="" />

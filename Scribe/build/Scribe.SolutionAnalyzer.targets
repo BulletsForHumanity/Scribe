@@ -1,0 +1,46 @@
+<Project>
+  <!--
+      Scribe Solution-Local Analyzer — Build Targets (Late Phase)
+
+      When $(ScribeSolutionAnalyzer) is 'true', ensures the NuGet global package
+      cache is cleared for this package before each pack. This forces consuming
+      projects to pick up the freshly-built .nupkg on every restore/build.
+  -->
+
+  <!-- ── Cache Invalidation ──────────────────────────────────────────────── -->
+  <!--
+      Clears the NuGet global packages cache entry and any existing .nupkg for
+      this package before packing. Without this, NuGet may serve a stale cached
+      copy even though the .nupkg on disk has been overwritten.
+
+      Runs before GenerateNuspec (which precedes Pack) so the cache is clean
+      before the new package is produced.
+  -->
+  <Target
+    Name="_ScribeSolutionAnalyzerClearCache"
+    BeforeTargets="GenerateNuspec"
+    Condition="'$(ScribeSolutionAnalyzer)' == 'true'"
+  >
+    <PropertyGroup>
+      <_ScribeSaCacheDir>$(NuGetPackageRoot)$([System.String]::Copy('$(PackageId)').ToLowerInvariant())\$(PackageVersion)\</_ScribeSaCacheDir>
+      <_ScribeSaNupkgPath>$(ScribeSolutionPackagesDir)$(PackageId).$(PackageVersion).nupkg</_ScribeSaNupkgPath>
+    </PropertyGroup>
+
+    <!-- Remove the cached extraction in the global packages folder. -->
+    <RemoveDir
+      Directories="$(_ScribeSaCacheDir)"
+      Condition="Exists('$(_ScribeSaCacheDir)')"
+    />
+
+    <!-- Remove the old .nupkg so Pack can overwrite cleanly. -->
+    <Delete
+      Files="$(_ScribeSaNupkgPath)"
+      Condition="Exists('$(_ScribeSaNupkgPath)')"
+    />
+
+    <Message
+      Text="[Scribe] Solution analyzer cache cleared for $(PackageId) $(PackageVersion)"
+      Importance="low"
+    />
+  </Target>
+</Project>

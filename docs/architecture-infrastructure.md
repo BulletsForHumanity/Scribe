@@ -1,6 +1,6 @@
 # How the Infrastructure Works
 
-Internal architecture of Scribe's build infrastructure — the Scribe SDK and LocalDev system. Read this if you're contributing to Scribe or want to understand the MSBuild mechanics.
+Internal architecture of Scribe's build infrastructure — the Scribe SDK, Solution-Local Analyzer, and LocalDev systems. Read this if you're contributing to Scribe or want to understand the MSBuild mechanics.
 
 For setup instructions, see [Project Setup & Infrastructure](project-setup.md).
 
@@ -20,6 +20,8 @@ BulletsForHumanity.Scribe.Sdk.nupkg
   build/
     Scribe.LocalDev.props   <- Shared LocalDev infrastructure (early phase)
     Scribe.LocalDev.targets <- Shared LocalDev infrastructure (late phase)
+    Scribe.SolutionAnalyzer.props   <- Solution-local analyzer support (early phase)
+    Scribe.SolutionAnalyzer.targets <- Solution-local analyzer support (late phase)
   content/
     Stubs.cs                <- netstandard2.0 polyfills, injected as Compile item
 ```
@@ -43,7 +45,8 @@ Runs before the project file is evaluated. Sets overridable defaults:
 1. **Chains to `Microsoft.NET.Sdk`** via `<Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />`
 2. **Sets analyzer project defaults**: `TargetFramework=netstandard2.0`, `LangVersion=14`, `EnforceExtendedAnalyzerRules=true`, `IncludeBuildOutput=false`, `PackageType=Analyzer`, embedded PDB, nullable enabled
 3. **Initialises `ScribeSdkIncludeStubs`** to `true` (opt-out via `<ScribeSdkIncludeStubs>false</ScribeSdkIncludeStubs>`)
-4. **Imports `Scribe.LocalDev.props`** for sentinel file detection and local NuGet source registration
+4. **Imports `Scribe.SolutionAnalyzer.props`** for solution-local analyzer auto-pack configuration
+5. **Imports `Scribe.LocalDev.props`** for sentinel file detection and local NuGet source registration
 
 All properties can be overridden by the consuming `.csproj` because they're set in the early phase.
 
@@ -56,7 +59,58 @@ Runs after the project file. Enforces packaging behaviour:
 3. **`_ScribeSdkAddAnalyzerDlls` target**: Places the analyzer DLL into `analyzers/dotnet/cs/` in the NuGet package
 4. **`_ScribeSdkAddAnalyzerDependencies` target**: Bundles private NuGet dependencies alongside the analyzer DLL. Excludes `Microsoft.CodeAnalysis.*` DLLs (provided by the compiler host).
 5. **Sets `CopyLocalLockFileAssemblies=true`** to enable dependency bundling
-6. **Imports `Scribe.LocalDev.targets`** for version override wildcard import
+6. **Imports `Scribe.SolutionAnalyzer.targets`** for solution-local cache invalidation
+7. **Imports `Scribe.LocalDev.targets`** for version override wildcard import
+
+---
+
+## Solution-Local Analyzer
+
+The Solution-Local Analyzer infrastructure enables intra-solution analyzer development — analyzers that live inside the same solution as the projects they serve, without publishing to NuGet.
+
+For setup instructions, see [Solution-Local Analyzers](solution-local-analyzers.md).
+
+### File Layout
+
+```
+Scribe/build/
+  Scribe.SolutionAnalyzer.props    <- Configuration (early phase)
+  Scribe.SolutionAnalyzer.targets  <- Cache invalidation target (late phase)
+```
+
+### Props Phase (Early)
+
+`Scribe.SolutionAnalyzer.props` runs when `ScribeSolutionAnalyzer=true`:
+
+1. **Locks the version** to `0.0.0-local` — disables NBGV (`NerdbankGitVersioningEnabled=false`)
+2. **Enables auto-pack** via `GeneratePackageOnBuild=true`
+3. **Resolves the package directory** — defaults to `.packages/` at the solution root (via `$(SolutionDir)` or parent of project directory)
+4. **Redirects pack output** to `$(ScribeSolutionPackagesDir)`
+5. **Registers as NuGet source** via `RestoreAdditionalProjectSources` (for the analyzer project itself)
+
+### Targets Phase (Late)
+
+`Scribe.SolutionAnalyzer.targets` defines one target:
+
+**`_ScribeSolutionAnalyzerClearCache`** — Runs before `GenerateNuspec` (which precedes Pack). Removes:
+- The cached package extraction from the NuGet global packages folder (`~/.nuget/packages/<id>/0.0.0-local/`)
+- The old `.nupkg` from the `.packages/` directory
+
+This ensures consuming projects always pick up the freshly-built package without requiring unique version numbers.
+
+### Relationship to LocalDev
+
+Solution-Local Analyzer and LocalDev are complementary:
+
+| Concern | LocalDev | Solution-Local Analyzer |
+|---------|----------|------------------------|
+| Scope | Cross-repo | Intra-solution |
+| Trigger | `.localscribe` sentinel | `ScribeSolutionAnalyzer=true` |
+| Version | NBGV + timestamp suffix | Fixed `0.0.0-local` |
+| Override files | Generated `.Directory.Packages.targets` | None needed |
+| Package directory | Shared `/.artifacts/packages/` | Solution-local `.packages/` |
+
+Both features are independent and can coexist. A solution can have solution-local analyzers and also participate in a LocalDev chain.
 
 ---
 

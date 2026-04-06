@@ -1,0 +1,83 @@
+<Project>
+  <!--
+      Scribe Solution-Local Analyzer — Property Definitions (Early Phase)
+
+      Automatically activates when a Scribe SDK project sets
+      ScribeSolutionAnalyzer=true. Configures auto-pack on build, outputs to a
+      solution-local .packages/ directory, and registers that directory as a
+      NuGet source.
+
+      ── Usage ────────────────────────────────────────────────────────────────
+
+      In the analyzer .csproj (uses the Scribe SDK):
+
+        <PropertyGroup>
+          <ScribeSolutionAnalyzer>true</ScribeSolutionAnalyzer>
+        </PropertyGroup>
+
+      Consuming projects reference the analyzer via standard PackageReference:
+
+        <PackageReference Include="MyAnalyzer" Version="0.0.0-local" />
+
+      A NuGet.config or Directory.Build.props must register the .packages/
+      directory as a package source. See docs/solution-local-analyzers.md.
+
+      ── Provides ─────────────────────────────────────────────────────────────
+
+        $(ScribeSolutionAnalyzer)      'true' when active.
+        $(ScribeSolutionPackagesDir)   Path to the solution-local .packages/ directory.
+
+      ── Customisation ────────────────────────────────────────────────────────
+
+        $(ScribeSolutionPackagesDir)   Override the default .packages/ location.
+  -->
+
+  <!-- ── Solution-Local Analyzer Configuration ─────────────────────────── -->
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true'">
+    <!-- Fixed local version — avoids versioning complexity for intra-solution packages.
+         Consuming projects reference this exact version. Cache invalidation is handled
+         by the companion _ScribeSolutionAnalyzerClearCache target. -->
+    <Version>0.0.0-local</Version>
+    <PackageVersion>0.0.0-local</PackageVersion>
+
+    <!-- Auto-pack on every build so consuming projects always get fresh output. -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IsPackable>true</IsPackable>
+
+    <!-- Disable Nerdbank.GitVersioning — version is fixed for solution-local analyzers. -->
+    <NerdbankGitVersioningEnabled>false</NerdbankGitVersioningEnabled>
+  </PropertyGroup>
+
+  <!-- ── Package Output Directory ──────────────────────────────────────── -->
+  <!--
+      Defaults to .packages/ relative to $(SolutionDir) (set by VS and
+      dotnet build *.sln), falling back to one level above the project
+      directory. Override with $(ScribeSolutionPackagesDir) in your
+      Directory.Build.props for non-standard layouts.
+  -->
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(ScribeSolutionPackagesDir)' == ''">
+    <ScribeSolutionPackagesDir
+      Condition="'$(SolutionDir)' != '' and '$(SolutionDir)' != '*Undefined*'"
+      >$(SolutionDir).packages\</ScribeSolutionPackagesDir>
+    <ScribeSolutionPackagesDir
+      Condition="'$(ScribeSolutionPackagesDir)' == ''"
+      >$(MSBuildProjectDirectory)\..\.packages\</ScribeSolutionPackagesDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true'">
+    <PackageOutputPath>$(ScribeSolutionPackagesDir)</PackageOutputPath>
+  </PropertyGroup>
+
+  <!-- ── NuGet Source Registration ─────────────────────────────────────── -->
+  <!--
+      Registers the .packages/ directory as an additional NuGet source so the
+      analyzer project itself can resolve sibling solution-local packages.
+      Consuming (non-SDK) projects must register this source separately via
+      NuGet.config or Directory.Build.props.
+  -->
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true'">
+    <RestoreAdditionalProjectSources>
+      $(RestoreAdditionalProjectSources);$(ScribeSolutionPackagesDir)
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+</Project>

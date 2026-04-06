@@ -53,6 +53,9 @@
     </ItemGroup>
   </Target>
 
+  <!-- ── Solution-Local Analyzer Infrastructure (Late Phase) ───────────── -->
+  <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.SolutionAnalyzer.targets" />
+
   <!-- ── LocalDev Infrastructure (Late Phase) ──────────────────────────── -->
   <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.LocalDev.targets" />
 </Project>

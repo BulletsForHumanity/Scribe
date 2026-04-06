@@ -143,6 +143,34 @@ For test projects that instantiate generators directly via `CSharpGeneratorDrive
 
 ---
 
+## Solution-Local Analyzers
+
+If your analyzer or generator lives inside the same solution it serves (and is not published to NuGet), the Scribe SDK can auto-pack it on build and make it available to other projects in the solution via standard `PackageReference`.
+
+Set `ScribeSolutionAnalyzer=true` in your analyzer `.csproj`:
+
+```xml
+<Project Sdk="BulletsForHumanity.Scribe.Sdk">
+  <PropertyGroup>
+    <ScribeSolutionAnalyzer>true</ScribeSolutionAnalyzer>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="BulletsForHumanity.Scribe" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
+```
+
+Consuming projects reference it like any NuGet package:
+
+```xml
+<PackageReference Include="MyAnalyzer" Version="0.0.0-local" />
+```
+
+See [Solution-Local Analyzers](solution-local-analyzers.md) for the complete setup guide, including NuGet source registration and troubleshooting.
+
+---
+
 ## Packaging
 
 ### Placing analyzer DLLs

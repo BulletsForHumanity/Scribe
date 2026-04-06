@@ -80,6 +80,24 @@ All polyfills are guarded by `#if !NET5_0_OR_GREATER` and deactivate on modern t
 
 The SDK includes [LocalDev](https://github.com/BulletsForHumanity/Scribe/blob/master/docs/project-setup.md#local-development-localdev) infrastructure for multi-repo development. See the main Scribe documentation for setup instructions.
 
+## Solution-Local Analyzers
+
+For analyzers that live inside the same solution they serve, set `ScribeSolutionAnalyzer=true` to auto-pack on build:
+
+```xml
+<Project Sdk="BulletsForHumanity.Scribe.Sdk">
+  <PropertyGroup>
+    <ScribeSolutionAnalyzer>true</ScribeSolutionAnalyzer>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="BulletsForHumanity.Scribe" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
+```
+
+See [Solution-Local Analyzers](https://github.com/BulletsForHumanity/Scribe/blob/master/docs/solution-local-analyzers.md) for the complete setup guide.
+
 ## Links
 
 - [Scribe Documentation](https://github.com/BulletsForHumanity/Scribe)

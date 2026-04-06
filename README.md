@@ -177,6 +177,7 @@ See [Project Setup & Infrastructure](docs/project-setup.md#local-development-loc
 | Component | Purpose |
 |-----------|---------|
 | [**Scribe SDK**](docs/project-setup.md#scribe-sdk-recommended) | MSBuild SDK — zero-config project setup for analyzer/generator projects |
+| [**Solution-Local Analyzers**](docs/solution-local-analyzers.md) | Auto-pack intra-solution analyzers — no NuGet publishing needed |
 | [**Quill**](docs/quill-reference.md) | Fluent source builder — indentation, usings, namespaces, XML docs, type resolution |
 | **ScribeHeader** | Assembly-level attribute for branding generated files with a decorative page header |
 | **Template** | Minimal `{{key}}` marker substitution for structural shells |
@@ -194,6 +195,7 @@ See [Project Setup & Infrastructure](docs/project-setup.md#local-development-loc
 |-------|---------------|
 | [Writing Generators with Quill](docs/writing-generators.md) | How to structure a generator using the Transform → Register → Render pattern |
 | [Project Setup & Infrastructure](docs/project-setup.md) | .csproj configuration, packaging, LocalDev multi-repo workflow |
+| [Solution-Local Analyzers](docs/solution-local-analyzers.md) | Setup guide for intra-solution analyzers and generators |
 | [Quill Feature Reference](docs/quill-reference.md) | Complete API reference for every Quill method and scope type |
 | [How Quill Works](docs/architecture-quill.md) | Internal architecture — type resolution, indentation, XML doc insertion |
 | [How the Infrastructure Works](docs/architecture-infrastructure.md) | Build system internals — LocalDev props/targets, override file generation |
