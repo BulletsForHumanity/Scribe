@@ -1,14 +1,68 @@
 # How the Infrastructure Works
 
-Internal architecture of Scribe's build infrastructure — the LocalDev system. Read this if you're contributing to Scribe or want to understand the MSBuild mechanics.
+Internal architecture of Scribe's build infrastructure — the Scribe SDK and LocalDev system. Read this if you're contributing to Scribe or want to understand the MSBuild mechanics.
 
 For setup instructions, see [Project Setup & Infrastructure](project-setup.md).
 
 ---
 
-## File Layout
+## Scribe SDK
 
-The infrastructure lives in `Scribe/build/` and is shipped inside the NuGet package:
+The Scribe SDK (`BulletsForHumanity.Scribe.Sdk`) is a custom MSBuild SDK that wraps `Microsoft.NET.Sdk` and auto-configures all boilerplate for Roslyn analyzer/generator projects.
+
+### Package Layout
+
+```
+BulletsForHumanity.Scribe.Sdk.nupkg
+  Sdk/
+    Sdk.props               <- Chains to Microsoft.NET.Sdk, sets analyzer defaults
+    Sdk.targets             <- Auto-includes Stubs.cs, defines packaging targets
+  build/
+    Scribe.LocalDev.props   <- Shared LocalDev infrastructure (early phase)
+    Scribe.LocalDev.targets <- Shared LocalDev infrastructure (late phase)
+  content/
+    Stubs.cs                <- netstandard2.0 polyfills, injected as Compile item
+```
+
+### SDK Resolution
+
+MSBuild resolves custom SDKs from NuGet packages that contain `Sdk/Sdk.props` and/or `Sdk/Sdk.targets`. Consumers declare the SDK version in `global.json`:
+
+```json
+{
+  "msbuild-sdks": {
+    "BulletsForHumanity.Scribe.Sdk": "0.3.0"
+  }
+}
+```
+
+### Sdk.props (Early Phase)
+
+Runs before the project file is evaluated. Sets overridable defaults:
+
+1. **Chains to `Microsoft.NET.Sdk`** via `<Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />`
+2. **Sets analyzer project defaults**: `TargetFramework=netstandard2.0`, `LangVersion=14`, `EnforceExtendedAnalyzerRules=true`, `IncludeBuildOutput=false`, `PackageType=Analyzer`, embedded PDB, nullable enabled
+3. **Initialises `ScribeSdkIncludeStubs`** to `true` (opt-out via `<ScribeSdkIncludeStubs>false</ScribeSdkIncludeStubs>`)
+4. **Imports `Scribe.LocalDev.props`** for sentinel file detection and local NuGet source registration
+
+All properties can be overridden by the consuming `.csproj` because they're set in the early phase.
+
+### Sdk.targets (Late Phase)
+
+Runs after the project file. Enforces packaging behaviour:
+
+1. **Chains to `Microsoft.NET.Sdk`** targets
+2. **Auto-includes `Stubs.cs`** as a `Compile` item with `Link="Generated\Stubs.cs"` (invisible in Solution Explorer). Guarded by `ScribeSdkIncludeStubs=true`.
+3. **`_ScribeSdkAddAnalyzerDlls` target**: Places the analyzer DLL into `analyzers/dotnet/cs/` in the NuGet package
+4. **`_ScribeSdkAddAnalyzerDependencies` target**: Bundles private NuGet dependencies alongside the analyzer DLL. Excludes `Microsoft.CodeAnalysis.*` DLLs (provided by the compiler host).
+5. **Sets `CopyLocalLockFileAssemblies=true`** to enable dependency bundling
+6. **Imports `Scribe.LocalDev.targets`** for version override wildcard import
+
+---
+
+## LocalDev File Layout
+
+The LocalDev infrastructure lives in `Scribe/build/` and is shipped inside both the `BulletsForHumanity.Scribe` NuGet package and the `BulletsForHumanity.Scribe.Sdk` package:
 
 ```
 Scribe/build/

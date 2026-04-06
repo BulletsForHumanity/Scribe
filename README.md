@@ -12,15 +12,38 @@ Scribe provides **Quill**, a fluent source builder that eliminates raw `StringBu
 
 ## Getting Started
 
+### With the Scribe SDK (Recommended)
+
+**1.** Add a `global.json` to your solution root:
+
+```json
+{
+  "msbuild-sdks": {
+    "BulletsForHumanity.Scribe.Sdk": "0.3.0"
+  }
+}
+```
+
+**2.** Create your analyzer/generator `.csproj`:
+
+```xml
+<Project Sdk="BulletsForHumanity.Scribe.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="BulletsForHumanity.Scribe" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
+```
+
+The SDK handles everything: `netstandard2.0` targeting, `LangVersion`, analyzer packaging, `Stubs.cs` polyfills, and dependency bundling. See [Project Setup](docs/project-setup.md) for details.
+
+### Manual Setup (Without SDK)
+
 ```shell
 dotnet add package BulletsForHumanity.Scribe
 ```
 
-**Requirements:** netstandard2.0 (required by the Roslyn compiler host). See [Project Setup](docs/project-setup.md) for a complete `.csproj` template.
-
-### Creating a Generator Project
-
-A minimal generator project that uses Scribe:
+A minimal generator project without the SDK:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -40,6 +63,8 @@ A minimal generator project that uses Scribe:
   </ItemGroup>
 </Project>
 ```
+
+See [Project Setup](docs/project-setup.md) for a complete `.csproj` template.
 
 Consumer projects reference the generator via NuGet (or a local package via [LocalDev](#local-development-localdev)):
 
@@ -151,6 +176,7 @@ See [Project Setup & Infrastructure](docs/project-setup.md#local-development-loc
 
 | Component | Purpose |
 |-----------|---------|
+| [**Scribe SDK**](docs/project-setup.md#scribe-sdk-recommended) | MSBuild SDK — zero-config project setup for analyzer/generator projects |
 | [**Quill**](docs/quill-reference.md) | Fluent source builder — indentation, usings, namespaces, XML docs, type resolution |
 | **ScribeHeader** | Assembly-level attribute for branding generated files with a decorative page header |
 | **Template** | Minimal `{{key}}` marker substitution for structural shells |

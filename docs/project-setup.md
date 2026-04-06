@@ -4,7 +4,71 @@ This guide covers how to configure a source generator or analyzer project that u
 
 ---
 
-## Generator Project Configuration
+## Scribe SDK (Recommended)
+
+The simplest way to set up a generator or analyzer project is with the **Scribe SDK**. It handles all boilerplate automatically.
+
+### 1. Add a `global.json`
+
+```json
+{
+  "msbuild-sdks": {
+    "BulletsForHumanity.Scribe.Sdk": "0.3.0"
+  }
+}
+```
+
+### 2. Use the SDK in your `.csproj`
+
+```xml
+<Project Sdk="BulletsForHumanity.Scribe.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="BulletsForHumanity.Scribe" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
+```
+
+That's it. The SDK sets all required properties, includes `Stubs.cs` polyfills, and configures analyzer packaging automatically.
+
+### What the SDK provides
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `TargetFramework` | `netstandard2.0` | Required by the Roslyn compiler host |
+| `LangVersion` | `14` | Modern C# features with polyfill stubs |
+| `EnforceExtendedAnalyzerRules` | `true` | Catches analyzer authoring mistakes |
+| `IncludeBuildOutput` | `false` | DLL goes into `analyzers/`, not `lib/` |
+| `PackageType` | `Analyzer` | Marks package as an analyzer |
+| `IncludeSymbols` | `false` | PDB is embedded in the DLL |
+| `DebugType` | `embedded` | IDE debugging support |
+| `Nullable` | `enable` | Null-safety |
+| `CopyLocalLockFileAssemblies` | `true` | Enables private dependency bundling |
+
+All properties can be overridden in your `.csproj`.
+
+### Stubs.cs opt-out
+
+The SDK auto-includes `Stubs.cs` polyfills. If you provide your own, opt out:
+
+```xml
+<PropertyGroup>
+  <ScribeSdkIncludeStubs>false</ScribeSdkIncludeStubs>
+</PropertyGroup>
+```
+
+### Packaging
+
+`dotnet pack` produces a correct analyzer NuGet package automatically:
+- Your analyzer DLL is placed in `analyzers/dotnet/cs/`
+- Private dependencies (like Scribe) are bundled alongside
+- Roslyn SDK DLLs are excluded (provided by the compiler host)
+
+---
+
+## Manual Configuration (Without SDK)
+
+If you prefer not to use the SDK, configure your project manually.
 
 Roslyn analyzers and source generators must target **netstandard2.0** — this is a hard requirement from the compiler host.
 
