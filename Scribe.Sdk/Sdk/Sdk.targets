@@ -1,0 +1,58 @@
+<Project>
+  <!--
+      BulletsForHumanity.Scribe.Sdk — Late Phase (Sdk.targets)
+
+      Defines packaging targets and auto-includes Stubs.cs polyfills.
+      These run after the project file has been evaluated, so they cannot
+      be overridden — they enforce correct analyzer packaging behaviour.
+  -->
+
+  <!-- Chain to the standard .NET SDK (late phase). -->
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- ── Auto-Include Stubs.cs Polyfills ───────────────────────────────── -->
+  <!--
+      Injects Stubs.cs as a compile item. The polyfills are guarded by
+      #if !NET5_0_OR_GREATER and deactivate on modern targets.
+      Set ScribeSdkIncludeStubs=false in your .csproj to opt out.
+  -->
+  <ItemGroup Condition="'$(ScribeSdkIncludeStubs)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)..\content\Stubs.cs"
+             Link="Generated\Stubs.cs"
+             Visible="false" />
+  </ItemGroup>
+
+  <!-- ── Analyzer DLL Packaging ────────────────────────────────────────── -->
+  <!--
+      Places the analyzer DLL into analyzers/dotnet/cs/ in the NuGet package.
+      This is required for Roslyn to discover the analyzer at build time.
+  -->
+  <Target Name="_ScribeSdkAddAnalyzerDlls" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(TargetPath)"
+            Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- ── Dependency Bundling ───────────────────────────────────────────── -->
+  <!--
+      Bundles private NuGet dependencies alongside the analyzer DLL.
+      Roslyn SDK DLLs (Microsoft.CodeAnalysis.*) are excluded — they are
+      provided by the compiler host.
+  -->
+
+  <Target Name="_ScribeSdkAddAnalyzerDependencies" BeforeTargets="_GetPackageFiles"
+          DependsOnTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <_ScribeSdkDeps Include="@(ReferenceCopyLocalPaths)"
+                       Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
+                                  and '$([System.String]::Copy(&quot;%(ReferenceCopyLocalPaths.NuGetPackageId)&quot;).StartsWith(&quot;Microsoft.CodeAnalysis&quot;))' != 'True'
+                                  and '%(Extension)' == '.dll'" />
+      <None Include="@(_ScribeSdkDeps)"
+            Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- ── LocalDev Infrastructure (Late Phase) ──────────────────────────── -->
+  <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.LocalDev.targets" />
+</Project>
