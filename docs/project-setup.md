@@ -45,7 +45,7 @@ That's it. The SDK sets all required properties, includes `Stubs.cs` polyfills, 
 | `Nullable` | `enable` | Null-safety |
 | `CopyLocalLockFileAssemblies` | `true` | Enables private dependency bundling |
 
-All properties can be overridden in your `.csproj`.
+All defaults are set in the early phase (`Sdk.props`) and can be overridden in your `.csproj`. Packaging targets (analyzer DLL placement, dependency bundling) are enforced by the SDK and cannot be overridden.
 
 ### Stubs.cs opt-out
 

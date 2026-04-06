@@ -29,7 +29,7 @@
   -->
   <Target Name="_ScribeSdkAddAnalyzerDlls" BeforeTargets="_GetPackageFiles">
     <ItemGroup>
-      <None Include="$(OutputPath)$(AssemblyName).dll"
+      <None Include="$(TargetPath)"
             Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     </ItemGroup>
   </Target>
@@ -40,19 +40,13 @@
       Roslyn SDK DLLs (Microsoft.CodeAnalysis.*) are excluded — they are
       provided by the compiler host.
   -->
-  <PropertyGroup>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
 
   <Target Name="_ScribeSdkAddAnalyzerDependencies" BeforeTargets="_GetPackageFiles"
           DependsOnTargets="ResolvePackageAssets">
     <ItemGroup>
       <_ScribeSdkDeps Include="@(ReferenceCopyLocalPaths)"
                        Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
-                                  and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.CSharp'
-                                  and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.Common'
-                                  and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.Analyzers'
-                                  and !%(ReferenceCopyLocalPaths.NuGetPackageId.StartsWith('Microsoft.CodeAnalysis'))
+                                  and '$([System.String]::Copy(&quot;%(ReferenceCopyLocalPaths.NuGetPackageId)&quot;).StartsWith(&quot;Microsoft.CodeAnalysis&quot;))' != 'True'
                                   and '%(Extension)' == '.dll'" />
       <None Include="@(_ScribeSdkDeps)"
             Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />

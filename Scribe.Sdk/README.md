@@ -50,7 +50,7 @@ That's it. The SDK handles everything else:
 | `GenerateDocumentationFile` | `false` | Not needed for bundled DLLs |
 | `CopyLocalLockFileAssemblies` | `true` | Enables private dependency bundling |
 
-All properties can be overridden in your `.csproj`.
+All defaults are set in the early phase (`Sdk.props`) and can be overridden in your `.csproj`. Packaging targets (analyzer DLL placement, dependency bundling) are enforced by the SDK and cannot be overridden.
 
 ## Stubs.cs Polyfills
 

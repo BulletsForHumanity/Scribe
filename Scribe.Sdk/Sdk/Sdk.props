@@ -46,6 +46,8 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <!-- NU5128: expected warning when lib/ is empty (due to IncludeBuildOutput=false). -->
     <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- Copy NuGet dependency DLLs to output so they can be bundled into the analyzer package. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <!-- ── Stubs Opt-Out ─────────────────────────────────────────────────── -->
