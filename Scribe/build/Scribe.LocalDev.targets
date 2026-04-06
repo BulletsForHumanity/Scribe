@@ -23,6 +23,16 @@
                                          Output: $(ScribeArtifactsDir)<Name>.Directory.Packages.targets
   -->
 
+  <!-- ── Import Guard ──────────────────────────────────────────────────── -->
+  <!-- Prevent double-import when both a NuGet package and a direct file import
+       bring in this file (mirrors the guard in Scribe.LocalDev.props). -->
+  <PropertyGroup Condition="'$(_ScribeLocalDevTargetsImported)' == 'true'">
+    <_ScribeLocalDevTargetsSkip>true</_ScribeLocalDevTargetsSkip>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(_ScribeLocalDevTargetsImported)' != 'true'">
+    <_ScribeLocalDevTargetsImported>true</_ScribeLocalDevTargetsImported>
+  </PropertyGroup>
+
   <!-- ── Import Version Override Files ──────────────────────────────────── -->
   <!--
       Each producer solution (Scribe, Hermetic, etc.) generates an override file:
@@ -36,12 +46,13 @@
   -->
   <Import
     Project="$(ScribeArtifactsDir)*.Directory.Packages.targets"
-    Condition="'$(IsLocalScribe)' == 'true'
+    Condition="'$(_ScribeLocalDevTargetsSkip)' != 'true'
+               and '$(IsLocalScribe)' == 'true'
                and '$(ScribeArtifactsDir)' != ''
                and Exists('$(ScribeArtifactsDir)')"
   />
 
-  <PropertyGroup Condition="'$(IsLocalScribe)' == 'true'">
+  <PropertyGroup Condition="'$(_ScribeLocalDevTargetsSkip)' != 'true' and '$(IsLocalScribe)' == 'true'">
     <ScribeLocalDevOverrideName
       Condition="'$(ScribeLocalDevOverrideName)' == ''"
       >$(ScribeLocalDevTriggerProject)</ScribeLocalDevOverrideName
@@ -71,7 +82,8 @@
   <Target
     Name="_ScribeLocalDevOverride"
     AfterTargets="Pack"
-    Condition="'$(IsLocalScribe)' == 'true'
+    Condition="'$(_ScribeLocalDevTargetsSkip)' != 'true'
+               and '$(IsLocalScribe)' == 'true'
                and '$(MSBuildProjectName)' == '$(ScribeLocalDevTriggerProject)'
                and '$(ScribeLocalDevPackageNames)' != ''"
   >

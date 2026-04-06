@@ -199,7 +199,7 @@ For direct import from a sibling checkout:
 
 Three ways to activate LocalDev:
 
-1. **Build configuration:** Select `Debug (Local Scribe)` or `Release (Local Scribe)` in your IDE — configurations are injected automatically.
+1. **Sentinel file (recommended):** Create a `.localscribe` file in `$(ScribeRoot)` (the shared workspace root). Delete it to deactivate. Add `.localscribe` to `.gitignore`.
 2. **MSBuild property:** `dotnet build -p:IsLocalScribe=true`
 3. **Props file:** Set `<IsLocalScribe>true</IsLocalScribe>` in `Directory.Build.props` or `Directory.Solution.props`.
 

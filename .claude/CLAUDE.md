@@ -33,7 +33,7 @@ Scribe is a **public, reusable library**. It is open-sourced independently. It m
 ## The Compass — Where to Find What You Need
 
 | Document | What it covers |
-|---|---|
+| --- | --- |
 | [README](../README.md) | Overview, quick start, component table, doc index |
 | [Writing Generators](../docs/writing-generators.md) | Transform -> Register -> Render pattern, Quill usage guide |
 | [Project Setup](../docs/project-setup.md) | .csproj configuration, packaging, Stubs, LocalDev multi-repo workflow with automatic local NuGet resolution |
@@ -48,7 +48,7 @@ Scribe is a **public, reusable library**. It is open-sourced independently. It m
 ## Terminology
 
 | Term | What it is |
-|---|---|
+| --- | --- |
 | **Quill** | The fluent source builder — handles indentation, blank-line separation, using directives, namespaces, and XML documentation. |
 | **Template** | Structured output template for generated code. |
 | **Naming** | Naming convention helpers for generated identifiers. |
@@ -115,7 +115,7 @@ This repository uses [Conventional Commits](https://www.conventionalcommits.org/
 **Format:** `<type>(<scope>): <subject>`
 
 | Type | When to use |
-|---|---|
+| --- | --- |
 | `feat` | A new feature or public surface addition |
 | `fix` | A bug fix |
 | `docs` | Documentation-only changes |
@@ -155,7 +155,7 @@ git config core.hooksPath .githooks
 ## CI/CD
 
 | Workflow | Trigger | What it does |
-|---|---|---|
+| --- | --- | --- |
 | **Build & Test** (`build-test.yml`) | Push to `master`, PRs to `master` | Restore → Build (Release) → Test → Upload packages as artefact |
 | **Release** (`release.yml`) | Manual dispatch from `master` | Build → Test → Push to NuGet → Tag commit → Create GitHub Release with notes derived from conventional commits |
 
