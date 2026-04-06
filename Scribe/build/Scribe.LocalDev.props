@@ -40,7 +40,7 @@
 
   <!-- ── Import Guard ──────────────────────────────────────────────────── -->
   <!-- Prevent double-import when both a NuGet package and a direct file import
-       bring in this file (e.g. Mish gets it from BFH.Hermetic NuGet AND from
+       bring in this file (e.g. Mish gets it from Hermetic NuGet AND from
        the sibling Scribe repo). -->
   <PropertyGroup Condition="'$(_ScribeLocalDevImported)' == 'true'">
     <_ScribeLocalDevSkip>true</_ScribeLocalDevSkip>

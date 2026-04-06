@@ -12,11 +12,11 @@
 
         $(ScribeLocalDevTriggerProject)  The MSBuild project name that triggers override file
                                          generation. Should be the main packable project.
-                                         Example: BFH.Hermetic
+                                         Example: Hermetic
 
         $(ScribeLocalDevPackageNames)    Semicolon-separated NuGet package IDs to include
                                          in the override file.
-                                         Example: BFH.Hermetic
+                                         Example: Hermetic
 
         $(ScribeLocalDevOverrideName)    File name prefix for the override file.
                                          Defaults to $(ScribeLocalDevTriggerProject).
@@ -82,8 +82,7 @@
   <Target
     Name="_ScribeLocalDevOverride"
     AfterTargets="Pack"
-    Condition="'$(_ScribeLocalDevTargetsSkip)' != 'true'
-               and '$(IsLocalScribe)' == 'true'
+    Condition="'$(IsLocalScribe)' == 'true'
                and '$(MSBuildProjectName)' == '$(ScribeLocalDevTriggerProject)'
                and '$(ScribeLocalDevPackageNames)' != ''"
   >
