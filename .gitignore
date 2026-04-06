@@ -1,3 +1,6 @@
+# Scribe LocalDev sentinel
+.localscribe
+
 # Build output
 bin/
 obj/

@@ -50,19 +50,22 @@ Prevents double-import when both a NuGet package and a direct file import bring 
 
 All subsequent property groups and imports are conditioned on `'$(_ScribeLocalDevSkip)' != 'true'`.
 
-### Configuration Injection
+### Sentinel File Detection
 
-Appends `Debug (Local Scribe)` and `Release (Local Scribe)` to the `$(Configurations)` property so they appear in IDE dropdowns:
+Activates Local Scribe mode when a `.localscribe` file exists in `$(ScribeRoot)` (the shared workspace root). This works in both Visual Studio and CLI builds without build configuration hacks.
 
 ```xml
-<Configurations>$(Configurations);Debug (Local Scribe);Release (Local Scribe)</Configurations>
+<PropertyGroup Condition="'$(_ScribeLocalDevSkip)' != 'true'
+                          and '$(IsLocalScribe)' != 'true'
+                          and '$(ScribeRoot)' != ''
+                          and Exists('$(ScribeRoot)\.localscribe')">
+  <IsLocalScribe>true</IsLocalScribe>
+</PropertyGroup>
 ```
-
-### Configuration Detection
 
 Three activation methods:
 
-1. **Configuration suffix:** `$(Configuration)` ends with `(Local Scribe)` — detected and normalized back to `Debug` or `Release`.
+1. **Sentinel file (recommended):** Create `.localscribe` in `$(ScribeRoot)`. Delete it to deactivate. Add `.localscribe` to `.gitignore`.
 2. **Explicit property:** `-p:IsLocalScribe=true` on the command line.
 3. **Props file:** `<IsLocalScribe>true</IsLocalScribe>` in Directory.Build.props or Directory.Solution.props.
 
