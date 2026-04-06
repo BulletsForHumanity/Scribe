@@ -3,9 +3,13 @@
       Scribe Solution-Local Analyzer — Property Definitions (Early Phase)
 
       Automatically activates when a Scribe SDK project sets
-      ScribeSolutionAnalyzer=true. Configures auto-pack on build, outputs to a
-      solution-local .packages/ directory, and registers that directory as a
-      NuGet source.
+      ScribeSolutionAnalyzer=true. Configures auto-pack on build with a
+      timestamp-based version, outputs to the solution's artifacts/packages/
+      directory, and registers that directory as a NuGet source.
+
+      Uses the same mechanism as LocalDev — the companion targets file
+      generates a version override .Directory.Packages.targets file so
+      consuming projects resolve the locally-built package automatically.
 
       ── Usage ────────────────────────────────────────────────────────────────
 
@@ -15,69 +19,72 @@
           <ScribeSolutionAnalyzer>true</ScribeSolutionAnalyzer>
         </PropertyGroup>
 
-      Consuming projects reference the analyzer via standard PackageReference:
+      Consuming projects reference the analyzer via standard PackageReference.
+      The version is managed automatically via an override file — consumers
+      only need to declare the PackageVersion Include in Directory.Packages.props
+      (any version; the override file will pin the actual version).
 
-        <PackageReference Include="MyAnalyzer" Version="0.0.0-local" />
+      ── Prerequisites ──────────────────────────────────────────────────────
 
-      A NuGet.config or Directory.Build.props must register the .packages/
-      directory as a package source. See docs/solution-local-analyzers.md.
+      The solution must use artifact output (UseArtifactsOutput=true) with
+      $(ArtifactsPath) set in Directory.Build.props.
+
+      The solution's Directory.Build.props must register the packages source:
+
+        <RestoreAdditionalProjectSources>
+          $(RestoreAdditionalProjectSources);$(ArtifactsPath)packages
+        </RestoreAdditionalProjectSources>
+
+      The solution's Directory.Build.targets must import override files:
+
+        <Import Project="$(ArtifactsPath)*.Directory.Packages.targets"
+                Condition="'$(ArtifactsPath)' != '' and Exists('$(ArtifactsPath)')" />
+
+      See docs/solution-local-analyzers.md for the complete setup guide.
 
       ── Provides ─────────────────────────────────────────────────────────────
 
-        $(ScribeSolutionAnalyzer)      'true' when active.
-        $(ScribeSolutionPackagesDir)   Path to the solution-local .packages/ directory.
-
-      ── Customisation ────────────────────────────────────────────────────────
-
-        $(ScribeSolutionPackagesDir)   Override the default .packages/ location.
+        $(ScribeSolutionAnalyzer)   'true' when active.
+        $(Version)                  Timestamp-based: 0.0.0-dev.yyyyMMddHHmmss
+        $(PackageVersion)           Same as $(Version).
   -->
 
   <!-- ── Solution-Local Analyzer Configuration ─────────────────────────── -->
   <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true'">
-    <!-- Fixed local version — avoids versioning complexity for intra-solution packages.
-         Consuming projects reference this exact version. Cache invalidation is handled
-         by the companion _ScribeSolutionAnalyzerClearCache target. -->
-    <Version>0.0.0-local</Version>
-    <PackageVersion>0.0.0-local</PackageVersion>
+    <!-- Timestamp-based version — each build produces a unique version,
+         which forces Visual Studio to reload the analyzer assembly.
+         No NuGet cache invalidation is needed because the version is always new. -->
+    <_ScribeSaTimestamp>$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))</_ScribeSaTimestamp>
+    <Version>0.0.0-dev.$(_ScribeSaTimestamp)</Version>
+    <PackageVersion>0.0.0-dev.$(_ScribeSaTimestamp)</PackageVersion>
 
     <!-- Auto-pack on every build so consuming projects always get fresh output. -->
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <IsPackable>true</IsPackable>
 
-    <!-- Disable Nerdbank.GitVersioning — version is fixed for solution-local analyzers. -->
+    <!-- Disable Nerdbank.GitVersioning — version is managed by the SDK. -->
     <NerdbankGitVersioningEnabled>false</NerdbankGitVersioningEnabled>
   </PropertyGroup>
 
   <!-- ── Package Output Directory ──────────────────────────────────────── -->
   <!--
-      Defaults to .packages/ relative to $(SolutionDir) (set by VS and
-      dotnet build *.sln), falling back to one level above the project
-      directory. Override with $(ScribeSolutionPackagesDir) in your
-      Directory.Build.props for non-standard layouts.
+      Outputs to $(ArtifactsPath)packages/ — the standard artifacts packages
+      directory. Projects using artifact output (UseArtifactsOutput=true) have
+      $(ArtifactsPath) set via Directory.Build.props.
   -->
-  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(ScribeSolutionPackagesDir)' == ''">
-    <ScribeSolutionPackagesDir
-      Condition="'$(SolutionDir)' != '' and '$(SolutionDir)' != '*Undefined*'"
-      >$(SolutionDir).packages\</ScribeSolutionPackagesDir>
-    <ScribeSolutionPackagesDir
-      Condition="'$(ScribeSolutionPackagesDir)' == ''"
-      >$(MSBuildProjectDirectory)\..\.packages\</ScribeSolutionPackagesDir>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true'">
-    <PackageOutputPath>$(ScribeSolutionPackagesDir)</PackageOutputPath>
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(ArtifactsPath)' != ''">
+    <PackageOutputPath>$(ArtifactsPath)packages\</PackageOutputPath>
   </PropertyGroup>
 
   <!-- ── NuGet Source Registration ─────────────────────────────────────── -->
   <!--
-      Registers the .packages/ directory as an additional NuGet source so the
-      analyzer project itself can resolve sibling solution-local packages.
-      Consuming (non-SDK) projects must register this source separately via
-      NuGet.config or Directory.Build.props.
+      Registers artifacts/packages/ as an additional NuGet source for the
+      analyzer project itself (so it can resolve sibling solution-local packages).
+      Consuming projects must register this source in Directory.Build.props.
   -->
-  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true'">
+  <PropertyGroup Condition="'$(ScribeSolutionAnalyzer)' == 'true' and '$(ArtifactsPath)' != ''">
     <RestoreAdditionalProjectSources>
-      $(RestoreAdditionalProjectSources);$(ScribeSolutionPackagesDir)
+      $(RestoreAdditionalProjectSources);$(ArtifactsPath)packages
     </RestoreAdditionalProjectSources>
   </PropertyGroup>
 </Project>

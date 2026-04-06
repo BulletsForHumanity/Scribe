@@ -161,13 +161,13 @@ Set `ScribeSolutionAnalyzer=true` in your analyzer `.csproj`:
 </Project>
 ```
 
-Consuming projects reference it like any NuGet package:
+Consuming projects reference it like any NuGet package (the version is managed automatically via an override file):
 
 ```xml
-<PackageReference Include="MyAnalyzer" Version="0.0.0-local" />
+<PackageReference Include="MyAnalyzer" />
 ```
 
-See [Solution-Local Analyzers](solution-local-analyzers.md) for the complete setup guide, including NuGet source registration and troubleshooting.
+See [Solution-Local Analyzers](solution-local-analyzers.md) for the complete setup guide, including consumer-side `Directory.Build.props` and `.targets` configuration.
 
 ---
 

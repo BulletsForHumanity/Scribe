@@ -82,7 +82,7 @@ The SDK includes [LocalDev](https://github.com/BulletsForHumanity/Scribe/blob/ma
 
 ## Solution-Local Analyzers
 
-For analyzers that live inside the same solution they serve, set `ScribeSolutionAnalyzer=true` to auto-pack on build:
+For analyzers that live inside the same solution they serve, set `ScribeSolutionAnalyzer=true` to auto-pack on build with automatic version management:
 
 ```xml
 <Project Sdk="BulletsForHumanity.Scribe.Sdk">
@@ -96,7 +96,7 @@ For analyzers that live inside the same solution they serve, set `ScribeSolution
 </Project>
 ```
 
-See [Solution-Local Analyzers](https://github.com/BulletsForHumanity/Scribe/blob/master/docs/solution-local-analyzers.md) for the complete setup guide.
+Each build produces a unique timestamp version and a version override file, using the same mechanism as [LocalDev](https://github.com/BulletsForHumanity/Scribe/blob/master/docs/project-setup.md#local-development-localdev) but scoped to the solution. See [Solution-Local Analyzers](https://github.com/BulletsForHumanity/Scribe/blob/master/docs/solution-local-analyzers.md) for the complete setup guide.
 
 ## Links
 
