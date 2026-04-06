@@ -3,7 +3,8 @@
       BulletsForHumanity.Scribe.Sdk — MSBuild SDK for Roslyn analyzer/generator projects.
 
       This is a pack-only project. It produces no build output — the NuGet package
-      contains only MSBuild props/targets, polyfill stubs, and LocalDev infrastructure.
+      contains only MSBuild props/targets, polyfill stubs, Solution-Local Analyzer
+      infrastructure, and LocalDev infrastructure.
   -->
   <PropertyGroup>
     <PackageId>BulletsForHumanity.Scribe.Sdk</PackageId>
@@ -18,7 +19,7 @@
     <NoWarn>$(NoWarn);NU5128;NU5129;NETSDK1212</NoWarn>
     <!-- Ensure .template.config and other dotfiles are included. -->
     <NoDefaultExcludes>true</NoDefaultExcludes>
-    <Description>MSBuild SDK for Roslyn analyzer and source generator projects. Provides default project configuration, analyzer packaging targets, netstandard2.0 polyfill stubs, and LocalDev multi-repo development infrastructure. Use with: &lt;Project Sdk="BulletsForHumanity.Scribe.Sdk"&gt;</Description>
+    <Description>MSBuild SDK for Roslyn analyzer and source generator projects. Provides default project configuration, analyzer packaging targets, netstandard2.0 polyfill stubs, solution-local analyzer auto-pack support, and LocalDev multi-repo development infrastructure. Use with: &lt;Project Sdk="BulletsForHumanity.Scribe.Sdk"&gt;</Description>
     <PackageTags>roslyn;analyzer;generator;source-generator;msbuild-sdk;scribe</PackageTags>
   </PropertyGroup>
 
@@ -36,6 +37,12 @@
   <ItemGroup>
     <None Include="..\Scribe\build\Scribe.LocalDev.props" Pack="true" PackagePath="build" />
     <None Include="..\Scribe\build\Scribe.LocalDev.targets" Pack="true" PackagePath="build" />
+  </ItemGroup>
+
+  <!-- Pack the SolutionAnalyzer build infrastructure from the main Scribe project. -->
+  <ItemGroup>
+    <None Include="..\Scribe\build\Scribe.SolutionAnalyzer.props" Pack="true" PackagePath="build" />
+    <None Include="..\Scribe\build\Scribe.SolutionAnalyzer.targets" Pack="true" PackagePath="build" />
   </ItemGroup>
 
   <!-- Pack LICENSE and README. -->
