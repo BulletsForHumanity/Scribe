@@ -39,10 +39,10 @@ public sealed class QuillTests
     [Fact]
     public void Inscribe_WithMultiLineHeader_EmitsAllLines()
     {
-        var result = new Quill().Header("HERMETIC\nAn application development kit\nhttps://github.com/BulletsForHumanity/Hermetic").Inscribe();
+        var result = new Quill().Header("HERMETIC\nA domain-driven development kit\nhttps://github.com/BulletsForHumanity/Hermetic").Inscribe();
 
         result.ShouldContain("HERMETIC");
-        result.ShouldContain("An application development kit");
+        result.ShouldContain("A domain-driven development kit");
         result.ShouldContain("github.com/BulletsForHumanity/Hermetic");
         result.ShouldContain("HEREBY ANNOUNCE");
     }
