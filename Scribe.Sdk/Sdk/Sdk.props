@@ -1,0 +1,59 @@
+<Project>
+  <!--
+      BulletsForHumanity.Scribe.Sdk — Early Phase (Sdk.props)
+
+      Sets default properties for Roslyn analyzer/source generator projects.
+      Chains to the standard Microsoft.NET.Sdk. All properties set here can be
+      overridden by the consuming project file.
+
+      Usage:
+        <Project Sdk="BulletsForHumanity.Scribe.Sdk">
+          <ItemGroup>
+            <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+          </ItemGroup>
+        </Project>
+
+      Requires a global.json entry for SDK resolution:
+        {
+          "msbuild-sdks": {
+            "BulletsForHumanity.Scribe.Sdk": "<version>"
+          }
+        }
+  -->
+
+  <!-- Chain to the standard .NET SDK (early phase). -->
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- ── Analyzer/Generator Project Defaults ───────────────────────────── -->
+  <!-- These can be overridden in the consuming .csproj. -->
+  <PropertyGroup>
+    <!-- Roslyn compiler host requires netstandard2.0. -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Modern C# features, enabled by Stubs.cs polyfills. -->
+    <LangVersion>14</LangVersion>
+    <!-- Catches common analyzer authoring mistakes at compile time (e.g. RS1035). -->
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Analyzer DLL goes into analyzers/dotnet/cs/, not lib/. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- Marks the NuGet package as an analyzer package. -->
+    <PackageType>Analyzer</PackageType>
+    <!-- Embed PDB into the DLL for IDE debugging. No separate .snupkg needed. -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <DebugType>embedded</DebugType>
+    <!-- Enable nullable reference types for modern null-safety. -->
+    <Nullable>enable</Nullable>
+    <!-- Disable doc XML file — analyzer DLLs are bundled, not referenced directly. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- NU5128: expected warning when lib/ is empty (due to IncludeBuildOutput=false). -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <!-- ── Stubs Opt-Out ─────────────────────────────────────────────────── -->
+  <!-- Consumers can set ScribeSdkIncludeStubs=false to skip Stubs.cs injection. -->
+  <PropertyGroup Condition="'$(ScribeSdkIncludeStubs)' == ''">
+    <ScribeSdkIncludeStubs>true</ScribeSdkIncludeStubs>
+  </PropertyGroup>
+
+  <!-- ── LocalDev Infrastructure (Early Phase) ─────────────────────────── -->
+  <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.LocalDev.props" />
+</Project>

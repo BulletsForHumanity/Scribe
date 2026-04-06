@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+      BulletsForHumanity.Scribe.Sdk — MSBuild SDK for Roslyn analyzer/generator projects.
+
+      This is a pack-only project. It produces no build output — the NuGet package
+      contains only MSBuild props/targets, polyfill stubs, and LocalDev infrastructure.
+  -->
+  <PropertyGroup>
+    <PackageId>BulletsForHumanity.Scribe.Sdk</PackageId>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- No build output — this is a pure SDK package. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- NU5128: no DLL in lib/ — expected for SDK packages.
+         NU5129: build/ files don't need PackageId-matching names — this is an MSBuild SDK, not a regular package.
+         NETSDK1212: IsTrimmable not supported on netstandard2.0 — irrelevant for pack-only project. -->
+    <NoWarn>$(NoWarn);NU5128;NU5129;NETSDK1212</NoWarn>
+    <!-- Ensure .template.config and other dotfiles are included. -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <Description>MSBuild SDK for Roslyn analyzer and source generator projects. Provides default project configuration, analyzer packaging targets, netstandard2.0 polyfill stubs, and LocalDev multi-repo development infrastructure. Use with: &lt;Project Sdk="BulletsForHumanity.Scribe.Sdk"&gt;</Description>
+    <PackageTags>roslyn;analyzer;generator;source-generator;msbuild-sdk;scribe</PackageTags>
+  </PropertyGroup>
+
+  <!-- Pack the SDK props/targets into the Sdk/ directory. -->
+  <ItemGroup>
+    <None Include="Sdk\**" Pack="true" PackagePath="Sdk" />
+  </ItemGroup>
+
+  <!-- Pack the polyfill stubs into the content/ directory. -->
+  <ItemGroup>
+    <None Include="content\**" Pack="true" PackagePath="content" />
+  </ItemGroup>
+
+  <!-- Pack the LocalDev build infrastructure from the main Scribe project. -->
+  <ItemGroup>
+    <None Include="..\Scribe\build\Scribe.LocalDev.props" Pack="true" PackagePath="build" />
+    <None Include="..\Scribe\build\Scribe.LocalDev.targets" Pack="true" PackagePath="build" />
+  </ItemGroup>
+
+  <!-- Pack LICENSE and README. -->
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+</Project>
