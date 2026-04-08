@@ -131,7 +131,7 @@ Packages are placed in `$(ArtifactsPath)packages/` — the standard artifacts pa
 
 A typical solution with a solution-local analyzer:
 
-```
+```text
 MySolution/
   MySolution.sln
   Directory.Build.props     ← UseArtifactsOutput, RestoreAdditionalProjectSources
@@ -178,7 +178,7 @@ A solution can have multiple solution-local analyzers. Each generates its own ov
 
 The wildcard import in `Directory.Build.targets` picks up all override files:
 
-```
+```csharp
 .artifacts/
   FirstAnalyzer.Directory.Packages.targets
   SecondAnalyzer.Directory.Packages.targets
@@ -194,7 +194,7 @@ The wildcard import in `Directory.Build.targets` picks up all override files:
 Solution-local analyzers use the **same mechanism** as LocalDev (version override files + NuGet source registration) but scoped to a single solution:
 
 | Concern | LocalDev | Solution-Local Analyzer |
-|---------|----------|------------------------|
+| --------- | ---------- | ------------------------ |
 | Scope | Cross-repo (e.g. Scribe → Hermetic → MyApp) | Intra-solution |
 | Trigger | `.localscribe` sentinel file | `ScribeSolutionAnalyzer=true` property |
 | Published? | Yes (eventually to NuGet) | Never |
@@ -210,7 +210,7 @@ Both features are independent and can coexist. A solution can have solution-loca
 ## Provided Properties
 
 | Property | Value | Set by |
-|----------|-------|--------|
+| ---------- | ------- | -------- |
 | `$(ScribeSolutionAnalyzer)` | `true` | Developer (in `.csproj`) |
 | `$(Version)` | `0.0.0-dev.yyyyMMddHHmmss` | SDK (timestamp-based) |
 | `$(PackageVersion)` | `0.0.0-dev.yyyyMMddHHmmss` | SDK (same as Version) |
@@ -222,7 +222,7 @@ Both features are independent and can coexist. A solution can have solution-loca
 ## Design Decisions
 
 | Decision | Choice | Rationale |
-|----------|--------|-----------|
+| ---------- | -------- | ----------- |
 | Detection mechanism | Explicit `ScribeSolutionAnalyzer=true` property | Simple, discoverable, no magic. Convention-based detection would be ambiguous. |
 | Version strategy | Timestamp-based `0.0.0-dev.yyyyMMddHHmmss` | Unique version per build forces Visual Studio to reload analyzers. Eliminates NuGet cache issues. |
 | Package directory | `$(ArtifactsPath)packages/` | Uses the solution's existing artifact output directory. No separate `.packages/` directory needed. |

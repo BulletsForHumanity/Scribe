@@ -3,7 +3,7 @@ namespace Scribe;
 /// <summary>Shared naming utilities for source generation.</summary>
 public static class Naming
 {
-    /// <summary>Converts PascalCase to kebab-case (e.g. ManifestIndex → manifest-index).</summary>
+    /// <summary>Converts PascalCase to kebab-case (e.g. ManifestIndex → manifest-index, HTTPServer → http-server, EMANATE → emanate).</summary>
     public static string ToKebabCase(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -12,13 +12,22 @@ public static class Naming
         for (var i = 0; i < name.Length; i++)
         {
             if (i > 0 && char.IsUpper(name[i]))
-                sb.Append('-');
+            {
+                var prevUpper = char.IsUpper(name[i - 1]);
+                var nextLower = i + 1 < name.Length && char.IsLower(name[i + 1]);
+
+                // Insert hyphen when:
+                //  - previous char was lowercase/digit → new word (e.g. "manifest|I" in ManifestIndex)
+                //  - previous char was upper AND next is lower → acronym ending (e.g. "HTT|P|S" before "erver" in HTTPServer)
+                if (!prevUpper || nextLower)
+                    sb.Append('-');
+            }
             sb.Append(char.ToLowerInvariant(name[i]));
         }
         return sb.ToString();
     }
 
-    /// <summary>Splits PascalCase into Title Words (e.g. ManifestDailyLog → "Manifest Daily Log").</summary>
+    /// <summary>Splits PascalCase into Title Words (e.g. ManifestDailyLog → "Manifest Daily Log", HTTPServer → "HTTP Server").</summary>
     public static string ToTitleWords(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -27,7 +36,13 @@ public static class Naming
         for (var i = 0; i < name.Length; i++)
         {
             if (i > 0 && char.IsUpper(name[i]))
-                sb.Append(' ');
+            {
+                var prevUpper = char.IsUpper(name[i - 1]);
+                var nextLower = i + 1 < name.Length && char.IsLower(name[i + 1]);
+
+                if (!prevUpper || nextLower)
+                    sb.Append(' ');
+            }
             sb.Append(name[i]);
         }
         return sb.ToString();
@@ -74,7 +89,11 @@ public static class Naming
 
         var raw = xml.Substring(start + 9, end - start - 9); // 9 = "<summary>".Length
         // Collapse whitespace — XML doc comments often contain indented newlines.
-        return raw.Trim().Replace("\r\n", " ").Replace("\n", " ").Replace("    ", " ").Trim();
+        var collapsed = raw.Trim().Replace("\r\n", " ").Replace("\n", " ");
+        // Collapse runs of multiple spaces into a single space.
+        while (collapsed.Contains("  "))
+            collapsed = collapsed.Replace("  ", " ");
+        return collapsed.Trim();
     }
 
     /// <summary>
