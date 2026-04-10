@@ -16,6 +16,17 @@
     <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
+  <!-- ── Scribe LocalDev ─────────────────────────────────────────────── -->
+  <!-- Scribe can't get these from a NuGet package (it IS the package),
+       so we set them here and import the props file directly. -->
+  <PropertyGroup>
+    <ScribeRoot>$(MSBuildThisFileDirectory)..</ScribeRoot>
+    <ScribeLocalDevTriggerProject>Scribe</ScribeLocalDevTriggerProject>
+    <ScribeLocalDevPackageNames>BulletsForHumanity.Scribe</ScribeLocalDevPackageNames>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)Scribe\build\Scribe.LocalDev.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)Scribe\build\Scribe.LocalDev.props')" />
+
   <PropertyGroup>
     <UseArtifactsOutput>true</UseArtifactsOutput>
     <ArtifactsPath>$(MSBuildThisFileDirectory).artifacts/</ArtifactsPath>
@@ -51,8 +62,10 @@
        Version is managed by Nerdbank.GitVersioning (version.json).
        ============================================================ -->
   <PropertyGroup>
-    <!-- CI uses explicit `dotnet pack` in the pipeline. No auto-pack needed. -->
-    <PackageOutputPath>$(ArtifactsPath)packages/</PackageOutputPath>
+    <!-- CI uses explicit `dotnet pack` in the pipeline. No auto-pack needed.
+         In Local Scribe mode, Scribe.LocalDev.props already redirects the trigger project
+         to the shared artifacts directory — don't overwrite that. -->
+    <PackageOutputPath Condition="'$(IsLocalScribe)' != 'true'">$(ArtifactsPath)packages/</PackageOutputPath>
     <Authors>Max Obrist</Authors>
     <Company>Bullets for Humanity</Company>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>

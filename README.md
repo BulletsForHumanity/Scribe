@@ -175,7 +175,7 @@ See [Project Setup & Infrastructure](docs/project-setup.md#local-development-loc
 ## What's Included
 
 | Component | Purpose |
-|-----------|---------|
+| ----------- | --------- |
 | [**Scribe SDK**](docs/project-setup.md#scribe-sdk-recommended) | MSBuild SDK — zero-config project setup for analyzer/generator projects |
 | [**Solution-Local Analyzers**](docs/solution-local-analyzers.md) | Auto-pack intra-solution analyzers — no NuGet publishing needed |
 | [**Quill**](docs/quill-reference.md) | Fluent source builder — indentation, usings, namespaces, XML docs, type resolution |
@@ -192,7 +192,7 @@ See [Project Setup & Infrastructure](docs/project-setup.md#local-development-loc
 ## Documentation
 
 | Guide | What it covers |
-|-------|---------------|
+| ------- | --------------- |
 | [Writing Generators with Quill](docs/writing-generators.md) | How to structure a generator using the Transform → Register → Render pattern |
 | [Project Setup & Infrastructure](docs/project-setup.md) | .csproj configuration, packaging, LocalDev multi-repo workflow |
 | [Solution-Local Analyzers](docs/solution-local-analyzers.md) | Setup guide for intra-solution analyzers and generators |

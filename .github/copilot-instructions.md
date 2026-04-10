@@ -131,13 +131,15 @@ This repository uses [Conventional Commits](https://www.conventionalcommits.org/
 **Scopes (optional):** `scribe`, `docs`, `ci`, `deps`
 
 **Rules:**
+
 - Subject must be lowercase
 - Header max 100 characters
 - Breaking changes: append `!` after type/scope (e.g. `feat(scribe)!: rename quill builder method`)
 - Body and footer are optional but encouraged for non-trivial changes
 
 **Examples:**
-```
+
+```text
 feat(scribe): add new quill builder method
 fix(scribe): correct indentation in generated output
 docs: update README quick start
@@ -146,6 +148,7 @@ feat(scribe)!: rename Template to SourceTemplate
 ```
 
 A commit-msg hook in `.githooks/` validates the format. Set it up with:
+
 ```bash
 git config core.hooksPath .githooks
 ```
@@ -164,6 +167,7 @@ git config core.hooksPath .githooks
 **Release notes** are derived automatically from conventional commit messages since the last tag.
 
 **Secrets required for release:**
+
 - `NUGET_API_KEY` — NuGet.org API key for package publishing
 
 ---

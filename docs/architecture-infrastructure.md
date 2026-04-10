@@ -12,7 +12,7 @@ The Scribe SDK (`BulletsForHumanity.Scribe.Sdk`) is a custom MSBuild SDK that wr
 
 ### Package Layout
 
-```
+```csharp
 BulletsForHumanity.Scribe.Sdk.nupkg
   Sdk/
     Sdk.props               <- Chains to Microsoft.NET.Sdk, sets analyzer defaults
@@ -72,7 +72,7 @@ For setup instructions, see [Solution-Local Analyzers](solution-local-analyzers.
 
 ### File Layout
 
-```
+```csharp
 Scribe/build/
   Scribe.SolutionAnalyzer.props    <- Configuration (early phase)
   Scribe.SolutionAnalyzer.targets  <- Override file generation (late phase)
@@ -111,7 +111,7 @@ Consuming projects import this file via wildcard from `$(ArtifactsPath)` in thei
 Solution-Local Analyzer and LocalDev use the same underlying mechanism but at different scopes:
 
 | Concern | LocalDev | Solution-Local Analyzer |
-|---------|----------|------------------------|
+| --------- | ---------- | ------------------------ |
 | Scope | Cross-repo | Intra-solution |
 | Trigger | `.localscribe` sentinel | `ScribeSolutionAnalyzer=true` |
 | Version | NBGV + timestamp suffix | Timestamp-only (`0.0.0-dev.yyyyMMddHHmmss`) |
@@ -127,7 +127,7 @@ Both features are independent and can coexist. A solution can have solution-loca
 
 The LocalDev infrastructure lives in `Scribe/build/` and is shipped inside both the `BulletsForHumanity.Scribe` NuGet package and the `BulletsForHumanity.Scribe.Sdk` package:
 
-```
+```csharp
 Scribe/build/
   BulletsForHumanity.Scribe.props    <- NuGet auto-import entry point (early)
   BulletsForHumanity.Scribe.targets  <- NuGet auto-import entry point (late)
@@ -248,7 +248,7 @@ The version is read from `$(NuGetPackageVersion)` (set by Nerdbank.GitVersioning
 
 The design supports arbitrary depth chains:
 
-```
+```csharp
 Scribe  ->  Hermetic  ->  MyApp
 ```
 
@@ -290,7 +290,7 @@ Local builds use timestamp-based dev version suffixes (e.g. `0.2.12-dev.20260405
 
 When LocalDev is active, the shared `/.artifacts/` directory looks like:
 
-```
+```csharp
 .artifacts/
   packages/
     MyFramework.1.2.3-dev.20260405120000.nupkg

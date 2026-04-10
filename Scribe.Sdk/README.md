@@ -38,7 +38,7 @@ That's it. The SDK handles everything else:
 ## What the SDK Sets
 
 | Property | Default | Purpose |
-|----------|---------|---------|
+| ---------- | --------- | --------- |
 | `TargetFramework` | `netstandard2.0` | Required by the Roslyn compiler host |
 | `LangVersion` | `14` | Modern C# features with polyfill stubs |
 | `EnforceExtendedAnalyzerRules` | `true` | Catches analyzer authoring mistakes |

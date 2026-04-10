@@ -34,7 +34,7 @@ That's it. The SDK sets all required properties, includes `Stubs.cs` polyfills, 
 ### What the SDK provides
 
 | Property | Default | Purpose |
-|----------|---------|---------|
+| ---------- | --------- | --------- |
 | `TargetFramework` | `netstandard2.0` | Required by the Roslyn compiler host |
 | `LangVersion` | `14` | Modern C# features with polyfill stubs |
 | `EnforceExtendedAnalyzerRules` | `true` | Catches analyzer authoring mistakes |
@@ -60,6 +60,7 @@ The SDK auto-includes `Stubs.cs` polyfills. If you provide your own, opt out:
 ### Packaging
 
 `dotnet pack` produces a correct analyzer NuGet package automatically:
+
 - Your analyzer DLL is placed in `analyzers/dotnet/cs/`
 - Private dependencies (like Scribe) are bundled alongside
 - Roslyn SDK DLLs are excluded (provided by the compiler host)
@@ -97,7 +98,7 @@ Roslyn analyzers and source generators must target **netstandard2.0** — this i
 ### Key Properties Explained
 
 | Property | Purpose |
-|----------|---------|
+| ---------- | --------- |
 | `TargetFrameworks=netstandard2.0` | Required by the Roslyn compiler host |
 | `LangVersion=14` | Use modern C# features (with Stubs polyfills) |
 | `EnforceExtendedAnalyzerRules` | Catches common analyzer authoring mistakes at compile time (e.g. RS1035) |
@@ -210,7 +211,7 @@ If your analyzer has private dependencies (like Scribe), include them alongside 
 Scribe ships `Stubs.cs` with internal polyfill types that enable modern C# features on netstandard2.0:
 
 | Feature | C# Version | Polyfill |
-|---------|-----------|----------|
+| --------- | ----------- | ---------- |
 | `init` setters / `record` types | C# 9 | `IsExternalInit` |
 | `[ModuleInitializer]` | C# 9 | `ModuleInitializerAttribute` |
 | `[SkipLocalsInit]` | C# 9 | `SkipLocalsInitAttribute` |
@@ -298,7 +299,7 @@ Three ways to activate LocalDev:
 ### Provided Properties
 
 | Property | Value when active |
-|----------|-------------------|
+| ---------- | ------------------- |
 | `$(IsLocalScribe)` | `true` |
 | `$(ScribeArtifactsDir)` | `$(ScribeRoot)\.artifacts\` |
 | `$(ScribePackagesDir)` | `$(ScribeArtifactsDir)packages\` |
@@ -306,7 +307,7 @@ Three ways to activate LocalDev:
 ### Configuration Properties
 
 | Property | Set by | Purpose |
-|----------|--------|---------|
+| ---------- | -------- | --------- |
 | `$(ScribeRoot)` | Consumer | Shared workspace root |
 | `$(ScribeLocalDevTriggerProject)` | Producer | MSBuild project name that triggers auto-pack and override generation |
 | `$(ScribeLocalDevPackageNames)` | Producer | Semicolon-separated NuGet package IDs to include in the override file |
@@ -316,7 +317,7 @@ Three ways to activate LocalDev:
 
 LocalDev supports multi-level chains. For example:
 
-```
+```csharp
 Scribe  ->  Hermetic  ->  MyApp
 ```
 

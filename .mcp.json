@@ -1,0 +1,19 @@
+{
+  "inputs": [],
+  "servers": {
+    "BinLog Analyzer": {
+      "type": "stdio",
+      "command": "E:\\repos\\mcp-binlog-tool\\artifacts\\bin\\binlog.mcp\\release\\binlog.mcp.exe",
+      "args": []
+    },
+    "uno": {
+      "type": "http",
+      "url": "https://mcp.platform.uno/v1",
+      "headers": {}
+    },
+    "DBHub": {
+      "type": "http",
+      "url": "http://localhost:58080/mcp"
+    }
+  }
+}
