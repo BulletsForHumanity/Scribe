@@ -19,7 +19,9 @@
       InternalsVisibleTo or a shared linked source.
   -->
 
-  <ItemGroup Condition="'$(ScribeSdkIncludeStubs)' == 'true'">
+  <!-- This file is only imported when $(ScribeSdkIncludeStubs) is true (gate
+       lives on the <Import> in Sdk.targets). No per-node condition needed. -->
+  <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)..\..\content\Stubs.cs"
              Link="Generated\Stubs.cs"
              Visible="false" />

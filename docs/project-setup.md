@@ -274,7 +274,7 @@ In the producer's `Directory.Build.props`, set the producer name and package IDs
 
 `$(ScribesName)` drives three things:
 
-- **Sentinel detection:** matches `.$(ScribesName).user` OR `.$(ScribesName).local` (lowercased, e.g. `.myframework.user` or `.myframework.local`) at `$(ScribeRoot)`. Either form activates — pick whichever you prefer.
+- **Sentinel detection:** matches `.$(ScribesName).scribe` (lowercased, e.g. `.myframework.scribe`) at `$(ScribeRoot)`.
 - **Auto-pack trigger:** the MSBuild project whose name equals `$(ScribesName)` is the one that packs.
 - **Override file name:** generated as `$(ScribesName).Directory.Packages.targets`.
 
@@ -300,9 +300,9 @@ For direct import from a sibling checkout:
 
 Activation is **per-producer**:
 
-1. **Sentinel file (recommended):** Create EITHER `.$(ScribesName).user` OR `.$(ScribesName).local` at `$(ScribeRoot)` — for example `.myframework.user` or `.myframework.local`. Either form works; pick whichever you prefer. Delete to deactivate. Multiple producers can be activated independently (e.g. `.scribe.user` + `.hermetic.local`). Already `.gitignore`d via the `*.user` and `*.local` patterns.
+1. **Sentinel file (recommended):** Create `.$(ScribesName).scribe` at `$(ScribeRoot)` — for example `.myframework.scribe`. Delete to deactivate. Multiple producers can be activated independently (e.g. `.scribe.scribe` + `.hermetic.scribe`). Already `.gitignore`d via a single `*.scribe` pattern.
 
-    **Why two forms?** `.user` is the long-standing .NET convention — `*.user` is already in the standard [VisualStudio.gitignore](https://github.com/github/gitignore/blob/main/VisualStudio.gitignore) so it won't be accidentally committed in any .NET repo. `.local` reads more naturally ("myframework, local variant") and matches the convention used by the JS ecosystem (Vite, Next.js, etc.). Rather than force a choice between "idiomatic .NET" and "idiomatic elsewhere," both are accepted.
+    **Why `.scribe`?** The suffix is brand-unique — zero risk of collision with `.user` (VS project user settings) or `.local` (Vite/Next.js/prettier env files) that a future tool might also scan. One `.gitignore` line (`*.scribe`) covers every producer regardless of name.
 
 2. **MSBuild property:** `dotnet build -p:IsLocalScribe=true` — activates consumer infra only; pair with a sentinel or `-p:IsLocalProducer=true` to enable a producer.
 3. **Props file:** Set `<IsLocalScribe>true</IsLocalScribe>` in `Directory.Build.props` or `Directory.Solution.props`.
@@ -313,8 +313,8 @@ Building a producer **without** its sentinel triggers automatic cleanup: the pro
 
 | Property | Value when active |
 | ---------- | ------------------- |
-| `$(IsLocalScribe)` | `true` when *any* `.*.user` or `.*.local` sentinel exists (umbrella — consumer infra) |
-| `$(IsLocalProducer)` | `true` when `.$(ScribesName).user` or `.$(ScribesName).local` exists (per-producer — pack + overrides) |
+| `$(IsLocalScribe)` | `true` when *any* `.*.scribe` sentinel exists (umbrella — consumer infra) |
+| `$(IsLocalProducer)` | `true` when `.$(ScribesName).scribe` exists (per-producer — pack + overrides) |
 | `$(ScribeArtifactsDir)` | `$(ScribeRoot)\.artifacts\` |
 | `$(ScribePackagesDir)` | `$(ScribeArtifactsDir)packages\` |
 

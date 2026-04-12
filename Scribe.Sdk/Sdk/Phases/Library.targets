@@ -26,8 +26,11 @@
       (a companion typically <ProjectReference>s its Library).
   -->
 
+  <!-- This file is only imported when $(_IsScribeLibrary) is true (gate lives on
+       the <Import> in Sdk.targets). No per-node conditions needed inside. -->
+
   <!-- ── Library defaults ────────────────────────────────────────────────── -->
-  <PropertyGroup Condition="'$(_IsScribeLibrary)' == 'true'">
+  <PropertyGroup>
     <!-- Libraries ship their own DLL in lib/. -->
     <IncludeBuildOutput Condition="'$(IncludeBuildOutput)' == ''">true</IncludeBuildOutput>
     <!-- NU5128 is only relevant when lib/ is empty — Library fills it. -->
@@ -49,7 +52,7 @@
   -->
   <Target Name="_ScribeSdkEmbedCompanions"
           BeforeTargets="_GetPackageFiles"
-          Condition="'$(_IsScribeLibrary)' == 'true' and '@(ScribeCompanion)' != ''">
+          Condition="'@(ScribeCompanion)' != ''">
     <MSBuild Projects="@(ScribeCompanion)"
              Targets="Build"
              Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false" />

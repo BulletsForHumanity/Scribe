@@ -23,7 +23,7 @@
       Scribe.LocalDev.props:
 
         $(ScribesName)                   Producer project name. Used for:
-                                          • sentinel detection: '.$(ScribesName).user' or '.$(ScribesName).local'
+                                          • sentinel detection: '.$(ScribesName).scribe'
                                           • auto-pack trigger: $(MSBuildProjectName) == $(ScribesName)
                                           • override file name: $(ScribesName).Directory.Packages.targets
                                          Example: Hermetic
@@ -110,8 +110,8 @@
 
   <!-- ── Cleanup When Sentinel Is Removed ───────────────────────────────── -->
   <!--
-      When a project in the producer set builds WITHOUT its '.$(ScribesName).user'
-      or '.$(ScribesName).local' sentinel, delete its own stale override file
+      When a project in the producer set builds WITHOUT its '.$(ScribesName).scribe'
+      sentinel, delete its own stale override file
       and stale -dev.* packages. Runs per-project (each project cleans up its
       own PackageId-keyed artifacts) so a newly-added project's artifacts get
       cleaned once it too builds sentinel-less.

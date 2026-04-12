@@ -29,8 +29,11 @@
         </PropertyGroup>
   -->
 
+  <!-- This file is only imported when $(_IsScribeMeta) is true (gate lives on
+       the <Import> in Sdk.targets). No per-node conditions needed inside. -->
+
   <!-- ── Meta defaults ───────────────────────────────────────────────────── -->
-  <PropertyGroup Condition="'$(_IsScribeMeta)' == 'true'">
+  <PropertyGroup>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageType>Analyzer</PackageType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -48,7 +51,7 @@
   </PropertyGroup>
 
   <!-- ── Artifacts directory (normalized with trailing slash) ────────────── -->
-  <PropertyGroup Condition="'$(_IsScribeMeta)' == 'true' and '$(ArtifactsPath)' != ''">
+  <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
     <_ScribeMetaArtifactsDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))</_ScribeMetaArtifactsDir>
     <PackageOutputPath>$(_ScribeMetaArtifactsDir)packages\</PackageOutputPath>
     <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(_ScribeMetaArtifactsDir)packages</RestoreAdditionalProjectSources>
@@ -56,8 +59,7 @@
 
   <!-- ── Own DLL + private deps into analyzers/dotnet/cs/ ────────────────── -->
   <Target Name="_ScribeSdkMetaAddAnalyzerDll"
-          BeforeTargets="_GetPackageFiles"
-          Condition="'$(_IsScribeMeta)' == 'true'">
+          BeforeTargets="_GetPackageFiles">
     <ItemGroup>
       <None Include="$(TargetPath)"
             Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
@@ -66,8 +68,7 @@
 
   <Target Name="_ScribeSdkMetaAddAnalyzerDependencies"
           BeforeTargets="_GetPackageFiles"
-          DependsOnTargets="ResolvePackageAssets"
-          Condition="'$(_IsScribeMeta)' == 'true'">
+          DependsOnTargets="ResolvePackageAssets">
     <ItemGroup>
       <_ScribeSdkMetaDep Include="@(ReferenceCopyLocalPaths)"
                          Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
@@ -79,7 +80,7 @@
   </Target>
 
   <!-- ── In-solution ProjectReference consumer path ──────────────────────── -->
-  <Target Name="GetDependencyTargetPaths" Condition="'$(_IsScribeMeta)' == 'true'">
+  <Target Name="GetDependencyTargetPaths">
     <ItemGroup>
       <TargetPathWithTargetPlatformMoniker Include="@(ReferenceCopyLocalPaths)"
                                            IncludeRuntimeDependency="false" />
@@ -89,8 +90,7 @@
   <!-- ── Emit PackageVersion override file after Pack ────────────────────── -->
   <Target Name="_ScribeSdkMetaOverride"
           AfterTargets="Pack"
-          Condition="'$(_IsScribeMeta)' == 'true'
-                     and '$(_ScribeMetaArtifactsDir)' != ''
+          Condition="'$(_ScribeMetaArtifactsDir)' != ''
                      and '$(PackageId)' != ''">
     <PropertyGroup>
       <_ScribeMetaOverrideVersion>$(NuGetPackageVersion)</_ScribeMetaOverrideVersion>

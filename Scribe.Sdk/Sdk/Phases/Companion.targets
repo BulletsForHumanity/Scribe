@@ -22,8 +22,11 @@
         </PropertyGroup>
   -->
 
+  <!-- This file is only imported when $(_IsScribeCompanion) is true (gate lives
+       on the <Import> in Sdk.targets). No per-node conditions needed inside. -->
+
   <!-- ── Companion defaults ──────────────────────────────────────────────── -->
-  <PropertyGroup Condition="'$(_IsScribeCompanion)' == 'true'">
+  <PropertyGroup>
     <!-- Companion DLL lives in analyzers/dotnet/cs/ of the host's package. -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <!-- Companions never produce their own nupkg. -->
@@ -44,7 +47,6 @@
       conflicts at analyze time).
   -->
   <Target Name="GetAnalyzerFiles"
-          Condition="'$(_IsScribeCompanion)' == 'true'"
           DependsOnTargets="ResolveAssemblyReferences"
           Returns="@(_AnalyzerFile)">
     <ItemGroup>
@@ -68,7 +70,7 @@
       TargetPathWithTargetPlatformMoniker carries them across the reference
       boundary.
   -->
-  <Target Name="GetDependencyTargetPaths" Condition="'$(_IsScribeCompanion)' == 'true'">
+  <Target Name="GetDependencyTargetPaths">
     <ItemGroup>
       <TargetPathWithTargetPlatformMoniker Include="@(ReferenceCopyLocalPaths)"
                                            IncludeRuntimeDependency="false" />
