@@ -14,7 +14,7 @@ internal sealed class AddAttributeFix : IShapeFix
         return name is null ? "Add required attribute" : $"Add '[{Shorten(name)}]'";
     }
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic diagnostic,
@@ -23,20 +23,20 @@ internal sealed class AddAttributeFix : IShapeFix
         var attributeName = AttributeName(diagnostic);
         if (attributeName is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var attr = SyntaxFactory.Attribute(SyntaxFactory.ParseName(Shorten(attributeName)));
         var attrList = SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(attr));
 
         var newTypeDecl = typeDecl.WithAttributeLists(typeDecl.AttributeLists.Add(attrList));
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 
     private static string? AttributeName(Diagnostic diagnostic)

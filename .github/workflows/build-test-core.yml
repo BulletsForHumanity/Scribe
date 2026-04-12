@@ -1,0 +1,101 @@
+name: Build & Test (Core)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Scribe/**'
+      - 'Scribe.Ink/**'
+      - 'Scribe.Scriptorium/**'
+      - 'Scribe.Tests/**'
+      - 'Scribe.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'version.json'
+      - '.config/dotnet-tools.json'
+      - '.github/workflows/build-test-core.yml'
+  pull_request:
+    paths:
+      - 'Scribe/**'
+      - 'Scribe.Ink/**'
+      - 'Scribe.Scriptorium/**'
+      - 'Scribe.Tests/**'
+      - 'Scribe.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'version.json'
+      - '.config/dotnet-tools.json'
+      - '.github/workflows/build-test-core.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-test:
+    name: Build & Test (Core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.*.props
+            **/Directory.*.targets
+
+      - name: Cache dotnet tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.dotnet/tools
+          key: ${{ runner.os }}-dotnet-tools-${{ hashFiles('.config/dotnet-tools.json') }}
+          restore-keys: |
+            ${{ runner.os }}-dotnet-tools-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore Scribe.slnx
+
+      - name: Build
+        run: dotnet build Scribe.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Scribe.slnx --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Pack core packages
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          dotnet pack Scribe/Scribe.csproj             --configuration Release --no-build --output .artifacts/packages
+          dotnet pack Scribe.Ink/Scribe.Ink.csproj     --configuration Release --no-build --output .artifacts/packages
+          dotnet pack Scribe.Scriptorium/Scribe.Scriptorium.csproj --configuration Release --no-build --output .artifacts/packages
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-core
+          path: "**/test-results.trx"
+
+      - name: Upload packages
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-core
+          path: .artifacts/packages/*.nupkg

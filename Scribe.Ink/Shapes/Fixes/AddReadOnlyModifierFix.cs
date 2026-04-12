@@ -6,9 +6,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Scribe.Ink.Shapes.Fixes;
 
-internal sealed class AddStaticModifierFix : IShapeFix
+internal sealed class AddReadOnlyModifierFix : IShapeFix
 {
-    public string Title(Diagnostic _) => "Add 'static' modifier";
+    public string Title(Diagnostic _) => "Add 'readonly' modifier";
 
     public async Task<Solution> FixAsync(
         Document document,
@@ -16,7 +16,7 @@ internal sealed class AddStaticModifierFix : IShapeFix
         Diagnostic _,
         CancellationToken ct)
     {
-        if (typeDecl.Modifiers.Any(SyntaxKind.StaticKeyword))
+        if (typeDecl.Modifiers.Any(SyntaxKind.ReadOnlyKeyword))
         {
             return document.Project.Solution;
         }
@@ -27,21 +27,24 @@ internal sealed class AddStaticModifierFix : IShapeFix
             return document.Project.Solution;
         }
 
-        var staticToken = SyntaxFactory.Token(SyntaxKind.StaticKeyword)
+        var readOnlyToken = SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword)
             .WithTrailingTrivia(SyntaxFactory.Space);
 
+        // Insert 'readonly' before 'partial' / 'ref' / type keyword for idiomatic ordering
+        // (mirrors AddSealedModifierFix).
         var modifiers = typeDecl.Modifiers;
         var insertAt = modifiers.Count;
         for (var i = 0; i < modifiers.Count; i++)
         {
-            if (modifiers[i].IsKind(SyntaxKind.PartialKeyword))
+            if (modifiers[i].IsKind(SyntaxKind.PartialKeyword)
+                || modifiers[i].IsKind(SyntaxKind.RefKeyword))
             {
                 insertAt = i;
                 break;
             }
         }
 
-        var newTypeDecl = typeDecl.WithModifiers(modifiers.Insert(insertAt, staticToken));
+        var newTypeDecl = typeDecl.WithModifiers(modifiers.Insert(insertAt, readOnlyToken));
         return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 }

@@ -35,8 +35,14 @@ public sealed partial class Shape<TModel>
         {
             if (_cachedDescriptors.IsDefault)
             {
-                var builder = ImmutableArray.CreateBuilder<DiagnosticDescriptor>(_checks.Length);
+                var builder = ImmutableArray.CreateBuilder<DiagnosticDescriptor>(
+                    _checks.Length + _memberChecks.Length);
                 foreach (var check in _checks)
+                {
+                    builder.Add(DescriptorFor(check));
+                }
+
+                foreach (var check in _memberChecks)
                 {
                     builder.Add(DescriptorFor(check));
                 }
@@ -59,9 +65,22 @@ public sealed partial class Shape<TModel>
             isEnabledByDefault: true));
     }
 
+    internal DiagnosticDescriptor DescriptorFor(MemberCheck check)
+    {
+        return _descriptorsById.GetOrAdd(check.Id, _ => new DiagnosticDescriptor(
+            id: check.Id,
+            title: check.Title,
+            messageFormat: check.MessageFormat,
+            category: "Scribe.Shape",
+            defaultSeverity: check.Severity,
+            isEnabledByDefault: true));
+    }
+
     internal TypeKindFilter KindFilter => _kind;
     internal string? PrimaryAttributeName => _primaryAttributeMetadataName;
+    internal string? PrimaryInterfaceName => _primaryInterfaceMetadataName;
     internal ShapeCheck[] CheckList => _checks;
+    internal MemberCheck[] MemberCheckList => _memberChecks;
 
     // RS1001 flags DiagnosticAnalyzer subclasses missing [DiagnosticAnalyzer]. This nested
     // class is intentionally unattributed: as a nested type of an open generic it would
@@ -105,6 +124,13 @@ public sealed partial class Shape<TModel>
                 return;
             }
 
+            if (_shape.PrimaryInterfaceName is { } ifaceName
+                && !Shape<TModel>.ImplementsInterface(type, ctx.Compilation, ifaceName))
+            {
+                // Shape drives off an interface the type doesn't implement — silently skip.
+                return;
+            }
+
             foreach (var check in _shape.CheckList)
             {
                 ctx.CancellationToken.ThrowIfCancellationRequested();
@@ -129,6 +155,38 @@ public sealed partial class Shape<TModel>
                     properties,
                     objArgs));
             }
+
+            if (_shape.MemberCheckList.Length > 0)
+            {
+                foreach (var member in EnumerateDeclaredMembers(type))
+                {
+                    foreach (var check in _shape.MemberCheckList)
+                    {
+                        ctx.CancellationToken.ThrowIfCancellationRequested();
+                        if (!check.Match(member))
+                        {
+                            continue;
+                        }
+
+                        var descriptor = _shape.DescriptorFor(check);
+                        var location = MemberSquiggleLocator.Resolve(
+                            member, check.SquiggleAt, ctx.CancellationToken);
+                        var properties = BuildMemberProperties(check, type, member);
+                        var args = check.MessageArgs(type, member);
+                        var objArgs = new object?[args.Count];
+                        for (var i = 0; i < args.Count; i++)
+                        {
+                            objArgs[i] = args[i];
+                        }
+
+                        ctx.ReportDiagnostic(Diagnostic.Create(
+                            descriptor,
+                            location,
+                            properties,
+                            objArgs));
+                    }
+                }
+            }
         }
 
         private static ImmutableDictionary<string, string?> BuildProperties(
@@ -140,6 +198,25 @@ public sealed partial class Shape<TModel>
             return props
                 .SetItem("fixKind", check.FixKind.ToString())
                 .SetItem("squiggleAt", check.SquiggleAt.ToString());
+        }
+
+        private static ImmutableDictionary<string, string?> BuildMemberProperties(
+            MemberCheck check, INamedTypeSymbol type, ISymbol member)
+        {
+            var props = check.FixProperties?.Invoke(type, member)
+                ?? ImmutableDictionary<string, string?>.Empty;
+
+            props = props
+                .SetItem("fixKind", check.FixKind.ToString())
+                .SetItem("memberSquiggleAt", check.SquiggleAt.ToString())
+                .SetItem("memberName", member.Name);
+
+            if (check.FixKind == FixKind.Custom && !string.IsNullOrEmpty(check.CustomFixTag))
+            {
+                props = props.SetItem("customFixTag", check.CustomFixTag);
+            }
+
+            return props;
         }
 
         private static bool MatchesKind(TypeKindFilter filter, INamedTypeSymbol symbol) =>

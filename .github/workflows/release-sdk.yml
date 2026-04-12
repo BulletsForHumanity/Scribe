@@ -1,0 +1,134 @@
+name: Release (SDK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run — validate package without pushing to NuGet'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TAG_PREFIX: sdk-v
+
+jobs:
+  release:
+    name: Publish SDK
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Download packages from latest SDK build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_JSON=$(gh run list \
+            --workflow "Build & Test (SDK)" \
+            --branch master \
+            --status success \
+            --limit 1 \
+            --json databaseId,headSha)
+
+          RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId')
+          RUN_SHA=$(echo "$RUN_JSON" | jq -r '.[0].headSha')
+          HEAD_SHA=$(git rev-parse HEAD)
+
+          echo "Latest successful SDK build: $RUN_ID (commit $RUN_SHA)"
+          echo "Current HEAD: $HEAD_SHA"
+
+          if [ "$RUN_SHA" != "$HEAD_SHA" ]; then
+            echo "::error::Artifact commit ($RUN_SHA) does not match current HEAD ($HEAD_SHA). Run Build & Test (SDK) on master first."
+            exit 1
+          fi
+
+          gh run download "$RUN_ID" --name packages-sdk --dir .artifacts/packages
+
+      - name: List downloaded packages
+        run: ls -la .artifacts/packages/
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION=$(dotnet nbgv get-version --project Scribe.Sdk --variable NuGetPackageVersion)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "### 📦 Scribe.Sdk: $VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push to NuGet
+        if: inputs.dry-run != 'true'
+        continue-on-error: true
+        run: |
+          dotnet nuget push ".artifacts/packages/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --skip-duplicate
+
+      - name: Generate release notes
+        if: inputs.dry-run != 'true'
+        id: notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --match "${TAG_PREFIX}*" 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+
+          # Restrict log to paths that influence the SDK package
+          NOTES=$(git log $RANGE --pretty=format:"- %s" --no-merges -- \
+            Scribe.Sdk \
+            Scribe/build/Scribe.LocalDev.props \
+            Scribe/build/Scribe.LocalDev.targets \
+            Directory.Build.props Directory.Build.targets \
+            Directory.Packages.props global.json LICENSE | head -50)
+          if [ -z "$NOTES" ]; then
+            NOTES="- No SDK changes since ${PREV_TAG:-initial commit}"
+          fi
+
+          {
+            echo "## Scribe SDK — What's Changed"
+            echo ""
+            echo "$NOTES"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Full Changelog:** https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG_PREFIX}${{ steps.version.outputs.version }}"
+          } > release-notes.md
+
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub Release
+        if: inputs.dry-run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${TAG_PREFIX}${{ steps.version.outputs.version }}" \
+            --title "Scribe SDK v${{ steps.version.outputs.version }}" \
+            --notes-file release-notes.md \
+            .artifacts/packages/*.nupkg
+
+      - name: Dry run summary
+        if: inputs.dry-run == 'true'
+        run: |
+          echo "### 🧪 Dry Run Complete (SDK)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Package built but NOT pushed to NuGet." >> "$GITHUB_STEP_SUMMARY"
+          echo "Version: ${{ steps.version.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          ls -la .artifacts/packages/ >> "$GITHUB_STEP_SUMMARY"

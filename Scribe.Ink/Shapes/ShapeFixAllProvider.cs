@@ -19,7 +19,9 @@ namespace Scribe.Ink.Shapes;
 ///     applies each fix to the original document and merges the results, which
 ///     fails when multiple diagnostics touch the same node. This provider applies
 ///     fixes sequentially per-type using a <see cref="SyntaxAnnotation"/> to
-///     re-locate the type declaration across edits.
+///     re-locate the type declaration across edits. Fixes return <see cref="Solution"/>
+///     (to accommodate cross-file rewriters); we thread the solution through and
+///     re-fetch the working document by <see cref="DocumentId"/> at each step.
 /// </summary>
 internal sealed class ShapeFixAllProvider : FixAllProvider
 {
@@ -50,63 +52,70 @@ internal sealed class ShapeFixAllProvider : FixAllProvider
     {
         var solution = context.Solution;
 
-        var documents = CollectDocuments(context, ct);
+        var documentIds = CollectDocumentIds(context, ct);
 
-        foreach (var document in documents)
+        foreach (var documentId in documentIds)
         {
             ct.ThrowIfCancellationRequested();
+            var document = solution.GetDocument(documentId);
+            if (document is null)
+            {
+                continue;
+            }
+
             var diagnostics = await context.GetDocumentDiagnosticsAsync(document).ConfigureAwait(false);
             if (diagnostics.IsDefaultOrEmpty)
             {
                 continue;
             }
 
-            var updated = await FixDocumentAsync(document, diagnostics, ct).ConfigureAwait(false);
-            if (updated is null)
-            {
-                continue;
-            }
-
-            solution = updated.Project.Solution;
+            solution = await FixDocumentAsync(solution, documentId, diagnostics, ct).ConfigureAwait(false);
         }
 
         return solution;
     }
 
-    private static IReadOnlyList<Document> CollectDocuments(
+    private static IReadOnlyList<DocumentId> CollectDocumentIds(
         FixAllContext context, CancellationToken ct)
     {
         switch (context.Scope)
         {
             case FixAllScope.Document when context.Document is not null:
-                return new[] { context.Document };
+                return new[] { context.Document.Id };
 
             case FixAllScope.Project when context.Project is not null:
-                return context.Project.Documents.ToArray();
+                return context.Project.DocumentIds.ToArray();
 
             case FixAllScope.Solution:
-                var all = new List<Document>();
+                var all = new List<DocumentId>();
                 foreach (var project in context.Solution.Projects)
                 {
                     ct.ThrowIfCancellationRequested();
-                    all.AddRange(project.Documents);
+                    all.AddRange(project.DocumentIds);
                 }
                 return all;
 
             default:
-                return Array.Empty<Document>();
+                return Array.Empty<DocumentId>();
         }
     }
 
-    private static async Task<Document?> FixDocumentAsync(
-        Document document,
+    private static async Task<Solution> FixDocumentAsync(
+        Solution solution,
+        DocumentId documentId,
         ImmutableArray<Diagnostic> diagnostics,
         CancellationToken ct)
     {
+        var document = solution.GetDocument(documentId);
+        if (document is null)
+        {
+            return solution;
+        }
+
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return null;
+            return solution;
         }
 
         // Group diagnostics by the type declaration they target, then annotate
@@ -132,7 +141,7 @@ internal sealed class ShapeFixAllProvider : FixAllProvider
 
         if (perType.Count == 0)
         {
-            return null;
+            return solution;
         }
 
         var annotations = new Dictionary<SyntaxAnnotation, List<Diagnostic>>();
@@ -148,7 +157,7 @@ internal sealed class ShapeFixAllProvider : FixAllProvider
             perType.Keys,
             (original, _) => original.WithAdditionalAnnotations(perTypeAnnotations[original]));
 
-        var workingDoc = document.WithSyntaxRoot(annotated);
+        solution = solution.WithDocumentSyntaxRoot(documentId, annotated);
 
         foreach (var pair in annotations)
         {
@@ -158,6 +167,12 @@ internal sealed class ShapeFixAllProvider : FixAllProvider
                 ct.ThrowIfCancellationRequested();
 
                 if (!TryResolveFix(diagnostic, out var fix))
+                {
+                    continue;
+                }
+
+                var workingDoc = solution.GetDocument(documentId);
+                if (workingDoc is null)
                 {
                     continue;
                 }
@@ -177,11 +192,11 @@ internal sealed class ShapeFixAllProvider : FixAllProvider
                     continue;
                 }
 
-                workingDoc = await fix.FixAsync(workingDoc, typeDecl, diagnostic, ct).ConfigureAwait(false);
+                solution = await fix.FixAsync(workingDoc, typeDecl, diagnostic, ct).ConfigureAwait(false);
             }
         }
 
-        return workingDoc;
+        return solution;
     }
 
     private static bool TryResolveFix(Diagnostic diagnostic, out IShapeFix fix)

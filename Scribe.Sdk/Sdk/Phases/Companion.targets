@@ -45,12 +45,19 @@
       sourced runtime dependency, minus the Roslyn host assemblies (which are
       already in the compiler's load context — bundling them causes version
       conflicts at analyze time).
+
+      Depends on Build (not just ResolveAssemblyReferences) because the host
+      library invokes this target via a nested <MSBuild> call. In that nested
+      context ResolveAssemblyReferences alone can register as "up-to-date" and
+      skip without repopulating @(ReferenceCopyLocalPaths), yielding empty
+      analyzer-file items. Build ensures the full reference-resolution chain
+      has run and $(TargetPath) / @(ReferenceCopyLocalPaths) are populated.
   -->
   <Target Name="GetAnalyzerFiles"
-          DependsOnTargets="ResolveAssemblyReferences"
+          DependsOnTargets="Build"
           Returns="@(_AnalyzerFile)">
     <ItemGroup>
-      <_AnalyzerFile Include="$(OutputPath)$(AssemblyName).dll" />
+      <_AnalyzerFile Include="$(TargetPath)" />
       <_AnalyzerFile Include="@(ReferenceCopyLocalPaths)"
                      Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
                                 and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.Common'

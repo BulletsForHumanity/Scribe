@@ -64,4 +64,19 @@ public enum FixKind
 
     /// <summary>Add an explicit public parameterless constructor to the type.</summary>
     AddParameterlessConstructor,
+
+    /// <summary>Add the <c>readonly</c> modifier to the type declaration.</summary>
+    AddReadOnlyModifier,
+
+    /// <summary>Remove the <c>readonly</c> modifier from the type declaration.</summary>
+    RemoveReadOnlyModifier,
+
+    /// <summary>
+    ///     User-supplied fix. The diagnostic carries a <c>customFixTag</c> property
+    ///     that <see cref="ShapeBuilder"/> consumers register a handler for via the
+    ///     Ink extension <c>WithCustomFix</c>. The fix provider looks up the tag
+    ///     and dispatches to the user delegate instead of the built-in
+    ///     <see cref="FixKind"/> catalog.
+    /// </summary>
+    Custom,
 }

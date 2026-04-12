@@ -18,20 +18,53 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
 {
     private readonly TypeKindFilter _kind;
     private readonly ShapeCheck[] _checks;
+    private readonly MemberCheck[] _memberChecks;
     private readonly string? _primaryAttributeMetadataName;
+    private readonly string? _primaryInterfaceMetadataName;
     private readonly ProjectionDelegate<TModel> _project;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _customFixes =
+        new(StringComparer.Ordinal);
 
     internal Shape(
         TypeKindFilter kind,
         ShapeCheck[] checks,
+        MemberCheck[] memberChecks,
         string? primaryAttributeMetadataName,
+        string? primaryInterfaceMetadataName,
         ProjectionDelegate<TModel> project)
     {
         _kind = kind;
         _checks = checks;
+        _memberChecks = memberChecks;
         _primaryAttributeMetadataName = primaryAttributeMetadataName;
+        _primaryInterfaceMetadataName = primaryInterfaceMetadataName;
         _project = project;
     }
+
+    /// <summary>
+    ///     Register a custom fix handler under <paramref name="tag"/>. The handler's
+    ///     runtime type is opaque to Scribe core — the Ink extension layer
+    ///     (<c>Scribe.Ink.Shapes.ShapeInkExtensions.WithCustomFix</c>) supplies the
+    ///     concrete delegate / <c>IShapeCustomFix</c> shape and casts back at dispatch
+    ///     time. Checks declared with <see cref="FixKind.Custom"/> and a matching
+    ///     <c>customFixTag</c> route through this registry.
+    /// </summary>
+    internal void RegisterCustomFix(string tag, object handler)
+    {
+        if (string.IsNullOrEmpty(tag))
+        {
+            throw new ArgumentException("Custom fix tag must not be empty.", nameof(tag));
+        }
+
+        _customFixes[tag] = handler ?? throw new ArgumentNullException(nameof(handler));
+    }
+
+    /// <summary>
+    ///     Look up a handler previously registered via <see cref="RegisterCustomFix"/>.
+    ///     Returns <see langword="null"/> when no handler is registered for <paramref name="tag"/>.
+    /// </summary>
+    internal object? TryGetCustomFix(string tag) =>
+        _customFixes.TryGetValue(tag, out var handler) ? handler : null;
 
     /// <summary>
     ///     Produce an <see cref="IncrementalValuesProvider{TValues}"/> of
@@ -116,6 +149,13 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
         }
 
         var compilation = semanticModel.Compilation;
+
+        if (_primaryInterfaceMetadataName is { } ifaceName
+            && !ImplementsInterface(symbol, compilation, ifaceName))
+        {
+            return null;
+        }
+
         var violations = RunChecks(symbol, compilation, ct);
 
         var attributeReader = _primaryAttributeMetadataName is not null
@@ -138,7 +178,7 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
     private EquatableArray<DiagnosticInfo> RunChecks(
         INamedTypeSymbol symbol, Compilation compilation, CancellationToken ct)
     {
-        if (_checks.Length == 0)
+        if (_checks.Length == 0 && _memberChecks.Length == 0)
         {
             return EquatableArray<DiagnosticInfo>.Empty;
         }
@@ -160,15 +200,135 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
                 Location: LocationInfo.From(FirstLocation(symbol))));
         }
 
+        if (_memberChecks.Length > 0)
+        {
+            foreach (var member in EnumerateDeclaredMembers(symbol))
+            {
+                foreach (var check in _memberChecks)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (!check.Match(member))
+                    {
+                        continue;
+                    }
+
+                    violations ??= new List<DiagnosticInfo>();
+                    violations.Add(new DiagnosticInfo(
+                        Id: check.Id,
+                        Severity: check.Severity,
+                        MessageArgs: check.MessageArgs(symbol, member),
+                        Location: LocationInfo.From(MemberFirstLocation(member))));
+                }
+            }
+        }
+
         return violations is null
             ? EquatableArray<DiagnosticInfo>.Empty
             : EquatableArray.From<DiagnosticInfo>(violations);
+    }
+
+    internal static IEnumerable<ISymbol> EnumerateDeclaredMembers(INamedTypeSymbol type)
+    {
+        // Stable source-order iteration: sort by first declaring syntax span.
+        // Implicitly-declared and synthesized members are filtered.
+        var members = new List<ISymbol>(type.GetMembers().Length);
+        foreach (var member in type.GetMembers())
+        {
+            if (member.IsImplicitlyDeclared)
+            {
+                continue;
+            }
+
+            if (member.DeclaringSyntaxReferences.Length == 0)
+            {
+                continue;
+            }
+
+            members.Add(member);
+        }
+
+        members.Sort(MemberSpanComparer.Instance);
+        return members;
+    }
+
+    private static Location? MemberFirstLocation(ISymbol member)
+    {
+        var locations = member.Locations;
+        return locations.Length == 0 ? null : locations[0];
+    }
+
+    private sealed class MemberSpanComparer : IComparer<ISymbol>
+    {
+        public static readonly MemberSpanComparer Instance = new();
+
+        public int Compare(ISymbol? x, ISymbol? y)
+        {
+            if (ReferenceEquals(x, y))
+            {
+                return 0;
+            }
+
+            if (x is null)
+            {
+                return -1;
+            }
+
+            if (y is null)
+            {
+                return 1;
+            }
+
+            var xRef = x.DeclaringSyntaxReferences.Length > 0 ? x.DeclaringSyntaxReferences[0] : null;
+            var yRef = y.DeclaringSyntaxReferences.Length > 0 ? y.DeclaringSyntaxReferences[0] : null;
+            if (xRef is null && yRef is null)
+            {
+                return string.CompareOrdinal(x.Name, y.Name);
+            }
+
+            if (xRef is null)
+            {
+                return -1;
+            }
+
+            if (yRef is null)
+            {
+                return 1;
+            }
+
+            var fileCmp = string.CompareOrdinal(xRef.SyntaxTree.FilePath, yRef.SyntaxTree.FilePath);
+            if (fileCmp != 0)
+            {
+                return fileCmp;
+            }
+
+            return xRef.Span.Start.CompareTo(yRef.Span.Start);
+        }
     }
 
     private static Location? FirstLocation(INamedTypeSymbol symbol)
     {
         var locations = symbol.Locations;
         return locations.Length == 0 ? null : locations[0];
+    }
+
+    internal static bool ImplementsInterface(
+        INamedTypeSymbol symbol, Compilation compilation, string metadataName)
+    {
+        var target = compilation.GetTypeByMetadataName(metadataName);
+        if (target is null)
+        {
+            return false;
+        }
+
+        foreach (var iface in symbol.AllInterfaces)
+        {
+            if (SymbolEqualityComparer.Default.Equals(iface.OriginalDefinition, target))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static class KindMatcher

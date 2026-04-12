@@ -25,7 +25,7 @@ internal sealed class SetVisibilityFix : IShapeFix
         return target is null ? "Change visibility" : $"Make '{target}'";
     }
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic diagnostic,
@@ -34,18 +34,18 @@ internal sealed class SetVisibilityFix : IShapeFix
         var target = Target(diagnostic);
         if (target is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         if (!TryGetKeywordKind(target, out var targetKind))
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var modifiers = typeDecl.Modifiers;
@@ -82,12 +82,12 @@ internal sealed class SetVisibilityFix : IShapeFix
             var newTypeDecl = typeDecl
                 .WithoutLeadingTrivia()
                 .WithModifiers(modifiers.Insert(0, newToken));
-            return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+            return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
         }
 
         var newModifiers = SyntaxFactory.TokenList(kept);
         var updated = typeDecl.WithModifiers(newModifiers);
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, updated));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, updated)).Project.Solution;
     }
 
     private static bool IsVisibilityKind(SyntaxKind kind)

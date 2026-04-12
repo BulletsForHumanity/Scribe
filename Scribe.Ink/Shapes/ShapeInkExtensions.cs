@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Scribe.Shapes;
@@ -26,12 +27,37 @@ public static class ShapeInkExtensions
             throw new ArgumentNullException(nameof(shape));
         }
 
-        var builder = ImmutableArray.CreateBuilder<string>(shape.CheckList.Length);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var check in shape.CheckList)
         {
-            builder.Add(check.Id);
+            ids.Add(check.Id);
         }
 
-        return new ShapeCodeFixProvider(builder.ToImmutable());
+        foreach (var check in shape.MemberCheckList)
+        {
+            ids.Add(check.Id);
+        }
+
+        return new ShapeCodeFixProvider(ids.ToImmutableArray(), shape.TryGetCustomFix);
+    }
+
+    /// <summary>
+    ///     Register a <see cref="IShapeCustomFix"/> handler under <paramref name="tag"/>.
+    ///     Diagnostics whose <c>fixKind</c> is <see cref="FixKind.Custom"/> and whose
+    ///     <c>customFixTag</c> property matches <paramref name="tag"/> will be routed
+    ///     to <paramref name="fix"/> by the provider returned from
+    ///     <see cref="ToFixProvider{TModel}"/>.
+    /// </summary>
+    public static Shape<TModel> WithCustomFix<TModel>(
+        this Shape<TModel> shape, string tag, IShapeCustomFix fix)
+        where TModel : IEquatable<TModel>
+    {
+        if (shape is null)
+        {
+            throw new ArgumentNullException(nameof(shape));
+        }
+
+        shape.RegisterCustomFix(tag, fix ?? throw new ArgumentNullException(nameof(fix)));
+        return shape;
     }
 }

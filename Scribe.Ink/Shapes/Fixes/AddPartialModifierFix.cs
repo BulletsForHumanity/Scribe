@@ -10,7 +10,7 @@ internal sealed class AddPartialModifierFix : IShapeFix
 {
     public string Title(Diagnostic _) => "Add 'partial' modifier";
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic _,
@@ -18,18 +18,18 @@ internal sealed class AddPartialModifierFix : IShapeFix
     {
         if (typeDecl.Modifiers.Any(SyntaxKind.PartialKeyword))
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var partialToken = SyntaxFactory.Token(SyntaxKind.PartialKeyword)
             .WithTrailingTrivia(SyntaxFactory.Space);
         var newTypeDecl = typeDecl.WithModifiers(typeDecl.Modifiers.Add(partialToken));
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 }

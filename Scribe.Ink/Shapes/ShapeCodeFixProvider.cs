@@ -19,8 +19,15 @@ namespace Scribe.Ink.Shapes;
 internal sealed class ShapeCodeFixProvider : CodeFixProvider
 {
     private readonly ImmutableArray<string> _ids;
+    private readonly Func<string, object?> _customFixLookup;
 
-    internal ShapeCodeFixProvider(ImmutableArray<string> diagnosticIds) => _ids = diagnosticIds;
+    internal ShapeCodeFixProvider(
+        ImmutableArray<string> diagnosticIds,
+        Func<string, object?> customFixLookup)
+    {
+        _ids = diagnosticIds;
+        _customFixLookup = customFixLookup;
+    }
 
     public override ImmutableArray<string> FixableDiagnosticIds => _ids;
 
@@ -45,13 +52,20 @@ internal sealed class ShapeCodeFixProvider : CodeFixProvider
                 continue;
             }
 
+            var node = root.FindNode(diagnostic.Location.SourceSpan);
+
+            if (fixKind == FixKind.Custom)
+            {
+                RegisterCustomFix(context, diagnostic, node);
+                continue;
+            }
+
             var fix = FixResolver.Resolve(fixKind);
             if (fix is null)
             {
                 continue;
             }
 
-            var node = root.FindNode(diagnostic.Location.SourceSpan);
             var typeDecl = node.AncestorsAndSelf().OfType<TypeDeclarationSyntax>().FirstOrDefault();
             if (typeDecl is null)
             {
@@ -61,10 +75,29 @@ internal sealed class ShapeCodeFixProvider : CodeFixProvider
             context.RegisterCodeFix(
                 CodeAction.Create(
                     title: fix.Title(diagnostic),
-                    createChangedDocument: ct => fix.FixAsync(context.Document, typeDecl, diagnostic, ct),
+                    createChangedSolution: ct => fix.FixAsync(context.Document, typeDecl, diagnostic, ct),
                     equivalenceKey: fixKind.ToString()),
                 diagnostic);
         }
     }
 
+    private void RegisterCustomFix(CodeFixContext context, Diagnostic diagnostic, SyntaxNode node)
+    {
+        if (!diagnostic.Properties.TryGetValue("customFixTag", out var tag) || string.IsNullOrEmpty(tag))
+        {
+            return;
+        }
+
+        if (_customFixLookup(tag!) is not IShapeCustomFix fix)
+        {
+            return;
+        }
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: fix.Title(diagnostic),
+                createChangedSolution: ct => fix.FixAsync(context.Document, node, diagnostic, ct),
+                equivalenceKey: "Custom:" + tag),
+            diagnostic);
+    }
 }
