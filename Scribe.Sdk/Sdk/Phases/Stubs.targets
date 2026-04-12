@@ -1,0 +1,27 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 05: Stubs Injection
+
+      Auto-includes Stubs.cs polyfills (init/record/required, nullable flow
+      annotations, interpolated-string handlers, etc.) for every Scribe.Sdk
+      project regardless of ScribeSdkProjectType.
+
+      Multi-targeting: MSBuild evaluates <Compile> items per target-framework
+      build, so this <Compile Include> applies to every TFM in $(TargetFrameworks)
+      automatically. The file's single #if !NET5_0_OR_GREATER guard gates the
+      type definitions per TFM — net5.0+ builds compile the file but emit no
+      types (the BCL already ships them), so there's no duplicate-type error.
+      No TFM condition is needed here.
+
+      Opt out per project with:
+        <ScribeSdkIncludeStubs>false</ScribeSdkIncludeStubs>
+      Useful when a sibling project already contributes the stubs via
+      InternalsVisibleTo or a shared linked source.
+  -->
+
+  <ItemGroup Condition="'$(ScribeSdkIncludeStubs)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)..\..\content\Stubs.cs"
+             Link="Generated\Stubs.cs"
+             Visible="false" />
+  </ItemGroup>
+</Project>

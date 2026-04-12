@@ -2,25 +2,36 @@
   <!--
       Scribe Local Development — Build Targets (Late Phase)
 
-      When $(IsLocalScribe) is 'true' and the project is packable:
-        1. Auto-packs the project after build (incremental — skips if the DLL hasn't changed).
-        2. Generates a version override file so consumers resolve the locally-built package.
+      Producer responsibilities (when $(IsLocalProducer) is 'true'):
+        1. Auto-pack via $(GeneratePackageOnBuild) set in Scribe.LocalDev.props.
+        2. Emit a version override file $(ScribesName).Directory.Packages.targets
+           listing locally-built package IDs at the timestamped dev version.
+
+      Producer cleanup (when $(IsLocalProducer) is 'false' but this project
+      declares $(ScribesName)):
+        1. Delete its own stale override file (if any).
+        2. Delete its own stale -dev.* packages from $(ScribePackagesDir).
+        This keeps the shared artifacts folder from accumulating forever.
+
+      Consumer responsibilities (when $(IsLocalScribe) is 'true'):
+        1. Import all *.Directory.Packages.targets from $(ScribeArtifactsDir)
+           so PackageVersion references get overridden to the local builds.
 
       ── Configuration ──────────────────────────────────────────────────────
 
-      Set these properties in your Directory.Build.targets BEFORE importing this file:
+      Set this property in your Directory.Build.props BEFORE importing
+      Scribe.LocalDev.props:
 
-        $(ScribeLocalDevTriggerProject)  The MSBuild project name that triggers override file
-                                         generation. Should be the main packable project.
+        $(ScribesName)                   Producer project name. Used for:
+                                          • sentinel detection: '.$(ScribesName).user' or '.$(ScribesName).local'
+                                          • auto-pack trigger: $(MSBuildProjectName) == $(ScribesName)
+                                          • override file name: $(ScribesName).Directory.Packages.targets
                                          Example: Hermetic
 
-        $(ScribeLocalDevPackageNames)    Semicolon-separated NuGet package IDs to include
-                                         in the override file.
-                                         Example: Hermetic
-
-        $(ScribeLocalDevOverrideName)    File name prefix for the override file.
-                                         Defaults to $(ScribeLocalDevTriggerProject).
-                                         Output: $(ScribeArtifactsDir)<Name>.Directory.Packages.targets
+      The override file's <PackageVersion Update> entry is derived automatically
+      from the trigger project's $(PackageId). Under the Scribe.Sdk Library +
+      Companion model only the Library project produces a nupkg (companions are
+      embedded), so a single PackageId is sufficient.
   -->
 
   <!-- ── Import Guard ──────────────────────────────────────────────────── -->
@@ -33,16 +44,18 @@
     <_ScribeLocalDevTargetsImported>true</_ScribeLocalDevTargetsImported>
   </PropertyGroup>
 
-  <!-- ── Import Version Override Files ──────────────────────────────────── -->
+  <!-- ── Import Version Override Files (consumer side) ──────────────────── -->
   <!--
-      Each producer solution (Scribe, Hermetic, etc.) generates an override file:
-        $(ScribeArtifactsDir)/<Name>.Directory.Packages.targets
+      Each active producer (Scribe, Hermetic, ...) emits:
+        $(ScribeArtifactsDir)/$(ScribesName).Directory.Packages.targets
       containing PackageVersion Update entries for locally-built packages.
-      The wildcard import picks up all of them.
+      The wildcard import picks up files only from producers currently in
+      producer mode (inactive producers clean up their own files).
 
-      This MUST live in .targets (not .props) because PackageVersion Update items
-      must be evaluated AFTER Directory.Packages.props declares the initial
-      PackageVersion Include items. .targets files are imported after .props.
+      This MUST live in .targets (not .props) because PackageVersion Update
+      items must be evaluated AFTER Directory.Packages.props declares the
+      initial PackageVersion Include items. .targets files are imported after
+      .props.
   -->
   <Import
     Project="$(ScribeArtifactsDir)*.Directory.Packages.targets"
@@ -52,55 +65,32 @@
                and Exists('$(ScribeArtifactsDir)')"
   />
 
-  <PropertyGroup Condition="'$(_ScribeLocalDevTargetsSkip)' != 'true' and '$(IsLocalScribe)' == 'true'">
-    <ScribeLocalDevOverrideName
-      Condition="'$(ScribeLocalDevOverrideName)' == ''"
-      >$(ScribeLocalDevTriggerProject)</ScribeLocalDevOverrideName
-    >
-  </PropertyGroup>
-
-  <!-- ── Auto-Pack ────────────────────────────────────────────��─────────── -->
+  <!-- ── Override File Generation (producer mode) ──────────────────────── -->
   <!--
-      Runs after Build for every packable project in Local Scribe mode.
-      Uses a sentinel file for incrementality: re-packs only when the output
-      assembly has changed (source was modified or a rebuild was forced).
-  -->
-  <!--
-      Auto-pack: enables GeneratePackageOnBuild for the trigger project when in
-      Local Scribe mode, and redirects output to the shared packages directory.
-      This piggybacks on the SDK's built-in pack-on-build mechanism, avoiding
-      circular dependencies and NoBuild propagation issues.
-  -->
-
-  <!-- ── Override File Generation ──────────────────────────────────────── -->
-  <!--
-      Runs after auto-pack on the trigger project only. Generates a
-      .Directory.Packages.targets file that the consumer's Scribe.LocalDev.props
-      imports via wildcard. Contains PackageVersion overrides for all configured
-      package names, pointing to the exact version that was just built.
+      Runs after Pack on every packable project in the producer set. Each
+      project emits its own $(PackageId).Directory.Packages.targets file with
+      a PackageVersion Update pinning its own PackageId to the just-built
+      version. Consumers import all such files via wildcard.
   -->
   <Target
     Name="_ScribeLocalDevOverride"
     AfterTargets="Pack"
-    Condition="'$(IsLocalScribe)' == 'true'
-               and '$(MSBuildProjectName)' == '$(ScribeLocalDevTriggerProject)'
-               and '$(ScribeLocalDevPackageNames)' != ''"
+    Condition="'$(IsLocalProducer)' == 'true'
+               and '$(ScribesName)' != ''
+               and '$(PackageId)' != ''
+               and '$(ScribeArtifactsDir)' != ''"
   >
     <PropertyGroup>
       <_ScribeDevVersion>$(NuGetPackageVersion)</_ScribeDevVersion>
       <_ScribeDevVersion Condition="'$(_ScribeDevVersion)' == ''">$(PackageVersion)</_ScribeDevVersion>
-      <_ScribeDevOverridePath>$(ScribeArtifactsDir)$(ScribeLocalDevOverrideName).Directory.Packages.targets</_ScribeDevOverridePath>
+      <_ScribeDevOverridePath>$(ScribeArtifactsDir)$(PackageId).Directory.Packages.targets</_ScribeDevOverridePath>
     </PropertyGroup>
-
-    <ItemGroup>
-      <_ScribeDevPackage Include="$(ScribeLocalDevPackageNames)" />
-    </ItemGroup>
 
     <ItemGroup>
       <_ScribeDevLine Include="&lt;Project&gt;" />
       <_ScribeDevLine Include="  &lt;!-- Auto-generated by Scribe LocalDev — do not edit. Rebuild the producer to refresh. --&gt;" />
       <_ScribeDevLine Include="  &lt;ItemGroup&gt;" />
-      <_ScribeDevLine Include="    &lt;PackageVersion Update=&quot;%(_ScribeDevPackage.Identity)&quot; Version=&quot;$(_ScribeDevVersion)&quot; /&gt;" />
+      <_ScribeDevLine Include="    &lt;PackageVersion Update=&quot;$(PackageId)&quot; Version=&quot;$(_ScribeDevVersion)&quot; /&gt;" />
       <_ScribeDevLine Include="  &lt;/ItemGroup&gt;" />
       <_ScribeDevLine Include="&lt;/Project&gt;" />
     </ItemGroup>
@@ -115,6 +105,57 @@
     <Message
       Text="[Scribe] Override → $(_ScribeDevOverridePath) ($(_ScribeDevVersion))"
       Importance="high"
+    />
+  </Target>
+
+  <!-- ── Cleanup When Sentinel Is Removed ───────────────────────────────── -->
+  <!--
+      When a project in the producer set builds WITHOUT its '.$(ScribesName).user'
+      or '.$(ScribesName).local' sentinel, delete its own stale override file
+      and stale -dev.* packages. Runs per-project (each project cleans up its
+      own PackageId-keyed artifacts) so a newly-added project's artifacts get
+      cleaned once it too builds sentinel-less.
+
+      Safety: deletion is scoped to files matching this project's own
+      $(PackageId) with a '-dev.' version suffix. Other producers' artifacts
+      are untouched.
+  -->
+  <Target
+    Name="_ScribeLocalDevCleanupStale"
+    BeforeTargets="Build"
+    Condition="'$(_ScribeLocalDevTargetsSkip)' != 'true'
+               and '$(IsLocalProducer)' != 'true'
+               and '$(ScribesName)' != ''
+               and '$(PackageId)' != ''
+               and '$(ScribeArtifactsDir)' != ''
+               and Exists('$(ScribeArtifactsDir)')"
+  >
+    <PropertyGroup>
+      <_ScribeCleanupOverride>$(ScribeArtifactsDir)$(PackageId).Directory.Packages.targets</_ScribeCleanupOverride>
+    </PropertyGroup>
+
+    <!-- Stale override file. -->
+    <Delete
+      Files="$(_ScribeCleanupOverride)"
+      Condition="Exists('$(_ScribeCleanupOverride)')"
+    />
+    <Message
+      Text="[Scribe] Cleanup → removed stale override $(_ScribeCleanupOverride)"
+      Importance="high"
+      Condition="Exists('$(_ScribeCleanupOverride)')"
+    />
+
+    <!-- Stale -dev.* packages keyed to this producer's PackageId. -->
+    <ItemGroup>
+      <_ScribeStalePackage Include="$(ScribePackagesDir)$(PackageId).*-dev.*.nupkg" />
+      <_ScribeStalePackage Include="$(ScribePackagesDir)$(PackageId).*-dev.*.snupkg" />
+    </ItemGroup>
+
+    <Delete Files="@(_ScribeStalePackage)" Condition="'@(_ScribeStalePackage)' != ''" />
+    <Message
+      Text="[Scribe] Cleanup → removed %(_ScribeStalePackage.Filename)%(_ScribeStalePackage.Extension)"
+      Importance="high"
+      Condition="'@(_ScribeStalePackage)' != ''"
     />
   </Target>
 </Project>

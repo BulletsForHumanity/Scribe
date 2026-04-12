@@ -1,0 +1,23 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 04: Validation
+
+      Hard-fails the build if $(ScribeSdkProjectType) is unset or invalid. Runs
+      before Build so errors surface before any wasted work.
+
+      Accepted values: Library, Companion, Analyzer, Meta.
+  -->
+
+  <Target Name="_ScribeSdkValidateProjectType" BeforeTargets="BeforeBuild;Restore;CoreCompile">
+    <Error
+      Condition="'$(ScribeSdkProjectType)' == ''"
+      Text="Scribe.Sdk: &lt;ScribeSdkProjectType&gt; is required in '$(MSBuildProjectFile)'. Set it to one of: Library, Companion, Analyzer, Meta." />
+    <Error
+      Condition="'$(ScribeSdkProjectType)' != ''
+                 and '$(_IsScribeLibrary)' != 'true'
+                 and '$(_IsScribeCompanion)' != 'true'
+                 and '$(_IsScribeAnalyzer)' != 'true'
+                 and '$(_IsScribeMeta)' != 'true'"
+      Text="Scribe.Sdk: '$(ScribeSdkProjectType)' is not a valid &lt;ScribeSdkProjectType&gt; in '$(MSBuildProjectFile)'. Accepted values: Library, Companion, Analyzer, Meta." />
+  </Target>
+</Project>

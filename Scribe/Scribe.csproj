@@ -23,6 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Scribe.Ink" />
     <InternalsVisibleTo Include="Scribe.Tests" />
   </ItemGroup>
 
@@ -41,5 +42,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Scriptorium: build-time-only meta-generator. Emits Should*/Could*/ShouldNot*
+       variants of each Must* primitive on ShapeBuilder. Never ships. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Scribe.Scriptorium\Scribe.Scriptorium.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,46 @@
+<!--
+    TODO(dogfood): switch to <Project Sdk="BulletsForHumanity.Scribe.Sdk"> once the
+    Sdk's project-types support lands (see SCRIBE_SDK_PROJECT_TYPES_REQS.md).
+    Until then, use Microsoft.NET.Sdk with the same settings Scribe.Sdk's Sdk.props applies.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackageType>Analyzer</PackageType>
+    <IncludeSymbols>false</IncludeSymbols>
+    <DebugType>embedded</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!--
+        RS1038: Workspaces-referencing assembly hosting an analyzer. We split usage
+        by class (analyzers don't touch Workspaces types; fixers do), so the Roslyn
+        host loads both happily. The blanket rule is conservative, so suppress it.
+        RS2008: analyzer release tracking is overkill for a small, versioned package.
+    -->
+    <NoWarn>$(NoWarn);NU5128;RS1038;RS2008</NoWarn>
+    <PackageId>BulletsForHumanity.Scribe.Ink</PackageId>
+    <Description>Roslyn analyzers, code fix providers, and source generators for Scribe shapes. The scribe dips the quill in ink to mark, correct, and emend.</Description>
+    <PackageTags>roslyn;analyzer;code-fix;source-generator;scribe</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Scribe.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="" />
+    <None Include="..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Scribe\Scribe.csproj" />
+  </ItemGroup>
+</Project>

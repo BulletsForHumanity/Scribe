@@ -1,0 +1,116 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 09: Meta
+
+      A Meta project is a build-time-only Roslyn generator/analyzer that lives
+      INSIDE the consuming solution. It runs during the consumer's own compile
+      (wired via ProjectReference OutputItemType="Analyzer") to emit code into
+      the consumer's assembly. Never shipped as a standalone NuGet package.
+
+      Auto-packs on every build when the solution uses UseArtifactsOutput=true
+      (i.e. $(ArtifactsPath) is set) — producing a timestamped -dev.* package
+      that consuming projects resolve via a PackageVersion override emitted to
+      $(ArtifactsPath)<PackageId>.Directory.Packages.targets.
+
+      The consumer's Directory.Build.targets must import override files via
+      wildcard:
+        <Import Project="$(ArtifactsPath)*.Directory.Packages.targets"
+                Condition="'$(ArtifactsPath)' != '' and Exists('$(ArtifactsPath)')" />
+
+      And Directory.Build.props must register the shared packages source:
+        <RestoreAdditionalProjectSources>
+          $(RestoreAdditionalProjectSources);$(ArtifactsPath)packages
+        </RestoreAdditionalProjectSources>
+
+      Usage in a Meta .csproj:
+        <PropertyGroup>
+          <ScribeSdkProjectType>Meta</ScribeSdkProjectType>
+          <PackageId>MyOrg.MyMeta</PackageId>
+        </PropertyGroup>
+  -->
+
+  <!-- ── Meta defaults ───────────────────────────────────────────────────── -->
+  <PropertyGroup Condition="'$(_IsScribeMeta)' == 'true'">
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackageType>Analyzer</PackageType>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+
+    <!-- Timestamped dev version — strictly increasing, defeats NuGet cache. -->
+    <_ScribeMetaTimestamp>$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))</_ScribeMetaTimestamp>
+    <Version>0.0.0-dev.$(_ScribeMetaTimestamp)</Version>
+    <PackageVersion>0.0.0-dev.$(_ScribeMetaTimestamp)</PackageVersion>
+
+    <!-- Auto-pack on every build; override Nerdbank.GitVersioning. -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IsPackable>true</IsPackable>
+    <NerdbankGitVersioningEnabled>false</NerdbankGitVersioningEnabled>
+  </PropertyGroup>
+
+  <!-- ── Artifacts directory (normalized with trailing slash) ────────────── -->
+  <PropertyGroup Condition="'$(_IsScribeMeta)' == 'true' and '$(ArtifactsPath)' != ''">
+    <_ScribeMetaArtifactsDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))</_ScribeMetaArtifactsDir>
+    <PackageOutputPath>$(_ScribeMetaArtifactsDir)packages\</PackageOutputPath>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(_ScribeMetaArtifactsDir)packages</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <!-- ── Own DLL + private deps into analyzers/dotnet/cs/ ────────────────── -->
+  <Target Name="_ScribeSdkMetaAddAnalyzerDll"
+          BeforeTargets="_GetPackageFiles"
+          Condition="'$(_IsScribeMeta)' == 'true'">
+    <ItemGroup>
+      <None Include="$(TargetPath)"
+            Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="_ScribeSdkMetaAddAnalyzerDependencies"
+          BeforeTargets="_GetPackageFiles"
+          DependsOnTargets="ResolvePackageAssets"
+          Condition="'$(_IsScribeMeta)' == 'true'">
+    <ItemGroup>
+      <_ScribeSdkMetaDep Include="@(ReferenceCopyLocalPaths)"
+                         Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
+                                    and '$([System.String]::Copy(&quot;%(ReferenceCopyLocalPaths.NuGetPackageId)&quot;).StartsWith(&quot;Microsoft.CodeAnalysis&quot;))' != 'True'
+                                    and '%(Extension)' == '.dll'" />
+      <None Include="@(_ScribeSdkMetaDep)"
+            Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- ── In-solution ProjectReference consumer path ──────────────────────── -->
+  <Target Name="GetDependencyTargetPaths" Condition="'$(_IsScribeMeta)' == 'true'">
+    <ItemGroup>
+      <TargetPathWithTargetPlatformMoniker Include="@(ReferenceCopyLocalPaths)"
+                                           IncludeRuntimeDependency="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- ── Emit PackageVersion override file after Pack ────────────────────── -->
+  <Target Name="_ScribeSdkMetaOverride"
+          AfterTargets="Pack"
+          Condition="'$(_IsScribeMeta)' == 'true'
+                     and '$(_ScribeMetaArtifactsDir)' != ''
+                     and '$(PackageId)' != ''">
+    <PropertyGroup>
+      <_ScribeMetaOverrideVersion>$(NuGetPackageVersion)</_ScribeMetaOverrideVersion>
+      <_ScribeMetaOverrideVersion Condition="'$(_ScribeMetaOverrideVersion)' == ''">$(PackageVersion)</_ScribeMetaOverrideVersion>
+      <_ScribeMetaOverridePath>$(_ScribeMetaArtifactsDir)$(PackageId).Directory.Packages.targets</_ScribeMetaOverridePath>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ScribeMetaOverrideLine Include="&lt;Project&gt;" />
+      <_ScribeMetaOverrideLine Include="  &lt;!-- Auto-generated by Scribe.Sdk (Meta). Rebuild to refresh. --&gt;" />
+      <_ScribeMetaOverrideLine Include="  &lt;ItemGroup&gt;" />
+      <_ScribeMetaOverrideLine Include="    &lt;PackageVersion Update=&quot;$(PackageId)&quot; Version=&quot;$(_ScribeMetaOverrideVersion)&quot; /&gt;" />
+      <_ScribeMetaOverrideLine Include="  &lt;/ItemGroup&gt;" />
+      <_ScribeMetaOverrideLine Include="&lt;/Project&gt;" />
+    </ItemGroup>
+    <MakeDir Directories="$(_ScribeMetaArtifactsDir)" />
+    <WriteLinesToFile File="$(_ScribeMetaOverridePath)"
+                      Lines="@(_ScribeMetaOverrideLine)"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+    <Message Text="[Scribe.Sdk:Meta] Override $(PackageId) $(_ScribeMetaOverrideVersion) → $(_ScribeMetaOverridePath)"
+             Importance="high" />
+  </Target>
+</Project>

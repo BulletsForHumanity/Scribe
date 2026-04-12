@@ -262,15 +262,23 @@ In the consumer's `Directory.Build.props`, point `ScribeRoot` to the shared work
 
 #### 2. Configure the producer
 
-In the producer's `Directory.Build.props`, set the trigger project and package names *before* importing Scribe's LocalDev files:
+In the producer's `Directory.Build.props`, set the producer name and package IDs *before* importing Scribe's LocalDev files:
 
 ```xml
 <PropertyGroup>
   <ScribeRoot>$(MSBuildThisFileDirectory)..</ScribeRoot>
-  <ScribeLocalDevTriggerProject>MyFramework</ScribeLocalDevTriggerProject>
+  <ScribesName>MyFramework</ScribesName>
   <ScribeLocalDevPackageNames>MyFramework</ScribeLocalDevPackageNames>
 </PropertyGroup>
 ```
+
+`$(ScribesName)` drives three things:
+
+- **Sentinel detection:** matches `.$(ScribesName).user` OR `.$(ScribesName).local` (lowercased, e.g. `.myframework.user` or `.myframework.local`) at `$(ScribeRoot)`. Either form activates — pick whichever you prefer.
+- **Auto-pack trigger:** the MSBuild project whose name equals `$(ScribesName)` is the one that packs.
+- **Override file name:** generated as `$(ScribesName).Directory.Packages.targets`.
+
+`$(ScribeName)` (non-possessive) is accepted as a typo-tolerant alias.
 
 #### 3. Import the LocalDev files
 
@@ -290,17 +298,23 @@ For direct import from a sibling checkout:
 
 #### 4. Activate
 
-Three ways to activate LocalDev:
+Activation is **per-producer**:
 
-1. **Sentinel file (recommended):** Create a `.localscribe` file in `$(ScribeRoot)` (the shared workspace root). Delete it to deactivate. Add `.localscribe` to `.gitignore`.
-2. **MSBuild property:** `dotnet build -p:IsLocalScribe=true`
+1. **Sentinel file (recommended):** Create EITHER `.$(ScribesName).user` OR `.$(ScribesName).local` at `$(ScribeRoot)` — for example `.myframework.user` or `.myframework.local`. Either form works; pick whichever you prefer. Delete to deactivate. Multiple producers can be activated independently (e.g. `.scribe.user` + `.hermetic.local`). Already `.gitignore`d via the `*.user` and `*.local` patterns.
+
+    **Why two forms?** `.user` is the long-standing .NET convention — `*.user` is already in the standard [VisualStudio.gitignore](https://github.com/github/gitignore/blob/main/VisualStudio.gitignore) so it won't be accidentally committed in any .NET repo. `.local` reads more naturally ("myframework, local variant") and matches the convention used by the JS ecosystem (Vite, Next.js, etc.). Rather than force a choice between "idiomatic .NET" and "idiomatic elsewhere," both are accepted.
+
+2. **MSBuild property:** `dotnet build -p:IsLocalScribe=true` — activates consumer infra only; pair with a sentinel or `-p:IsLocalProducer=true` to enable a producer.
 3. **Props file:** Set `<IsLocalScribe>true</IsLocalScribe>` in `Directory.Build.props` or `Directory.Solution.props`.
+
+Building a producer **without** its sentinel triggers automatic cleanup: the producer's stale `-dev.*` packages and its override file are deleted from `.artifacts/`.
 
 ### Provided Properties
 
 | Property | Value when active |
 | ---------- | ------------------- |
-| `$(IsLocalScribe)` | `true` |
+| `$(IsLocalScribe)` | `true` when *any* `.*.user` or `.*.local` sentinel exists (umbrella — consumer infra) |
+| `$(IsLocalProducer)` | `true` when `.$(ScribesName).user` or `.$(ScribesName).local` exists (per-producer — pack + overrides) |
 | `$(ScribeArtifactsDir)` | `$(ScribeRoot)\.artifacts\` |
 | `$(ScribePackagesDir)` | `$(ScribeArtifactsDir)packages\` |
 
@@ -309,9 +323,8 @@ Three ways to activate LocalDev:
 | Property | Set by | Purpose |
 | ---------- | -------- | --------- |
 | `$(ScribeRoot)` | Consumer | Shared workspace root |
-| `$(ScribeLocalDevTriggerProject)` | Producer | MSBuild project name that triggers auto-pack and override generation |
+| `$(ScribesName)` | Producer | Producer name — drives sentinel detection, auto-pack trigger, and override file name. `$(ScribeName)` is accepted as a typo alias. |
 | `$(ScribeLocalDevPackageNames)` | Producer | Semicolon-separated NuGet package IDs to include in the override file |
-| `$(ScribeLocalDevOverrideName)` | Producer (optional) | Override file name prefix — defaults to `$(ScribeLocalDevTriggerProject)` |
 
 ### Chaining
 

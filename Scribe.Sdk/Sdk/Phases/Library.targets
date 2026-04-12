@@ -1,0 +1,80 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 06: Library
+
+      A Library is the main shippable artifact. It produces a regular NuGet
+      package. If it declares <ScribeCompanion> items pointing at sibling
+      Companion .csproj files, each companion is built at pack time and its
+      analyzer DLLs (plus private runtime deps) are embedded into the Library's
+      own nupkg at analyzers/dotnet/cs/.
+
+      Consumers install a single package and receive the runtime assemblies
+      AND the bundled analyzers automatically — no companion reference needed.
+
+      Usage in a Library .csproj:
+        <PropertyGroup>
+          <ScribeSdkProjectType>Library</ScribeSdkProjectType>
+          <PackageId>MyOrg.MyLib</PackageId>
+        </PropertyGroup>
+        <ItemGroup>
+          <ScribeCompanion Include="..\MyLib.Generators\MyLib.Generators.csproj" />
+          <ScribeCompanion Include="..\MyLib.Fixes\MyLib.Fixes.csproj" />
+        </ItemGroup>
+
+      The companion projects do NOT need to be referenced via <ProjectReference>
+      — embedding is handled here at pack time to avoid circular dependencies
+      (a companion typically <ProjectReference>s its Library).
+  -->
+
+  <!-- ── Library defaults ────────────────────────────────────────────────── -->
+  <PropertyGroup Condition="'$(_IsScribeLibrary)' == 'true'">
+    <!-- Libraries ship their own DLL in lib/. -->
+    <IncludeBuildOutput Condition="'$(IncludeBuildOutput)' == ''">true</IncludeBuildOutput>
+    <!-- NU5128 is only relevant when lib/ is empty — Library fills it. -->
+    <NoWarn>$(NoWarn.Replace(';NU5128',''))</NoWarn>
+  </PropertyGroup>
+
+  <!-- ── Companion Embedding ─────────────────────────────────────────────── -->
+  <!--
+      Runs before packing. For each <ScribeCompanion> item, invokes the
+      companion's Build + GetAnalyzerFiles targets in a separate MSBuild
+      sub-invocation and pins the results into analyzers/dotnet/cs/.
+
+      GetAnalyzerFiles lives in Companion.targets (Phase 07) and returns the
+      companion's own DLL + filtered private dependency DLLs (excluding the
+      Roslyn host assemblies).
+
+      Building explicitly for netstandard2.0 ensures the compatible analyzer
+      DLL exists even when the Library itself targets a different TFM.
+  -->
+  <Target Name="_ScribeSdkEmbedCompanions"
+          BeforeTargets="_GetPackageFiles"
+          Condition="'$(_IsScribeLibrary)' == 'true' and '@(ScribeCompanion)' != ''">
+    <MSBuild Projects="@(ScribeCompanion)"
+             Targets="Build"
+             Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false" />
+    <MSBuild Projects="@(ScribeCompanion)"
+             Targets="GetAnalyzerFiles"
+             Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false">
+      <Output TaskParameter="TargetOutputs" ItemName="_ScribeCompanionAnalyzerFileRaw" />
+    </MSBuild>
+    <!-- Deduplicate by filename. Multiple companions commonly pull in the same
+         shared runtime deps (e.g. the host Library's own DLL). Without this,
+         the nupkg ends up with duplicate analyzer files at the same path. -->
+    <RemoveDuplicates Inputs="@(_ScribeCompanionAnalyzerFileRaw->'%(Filename)%(Extension)')">
+      <Output TaskParameter="Filtered" ItemName="_ScribeCompanionAnalyzerName" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <_ScribeCompanionAnalyzerFile
+        Include="@(_ScribeCompanionAnalyzerFileRaw)"
+        Condition="'@(_ScribeCompanionAnalyzerName)' != ''
+                   and $([System.String]::new('%3B@(_ScribeCompanionAnalyzerName)%3B').Contains('%3B%(_ScribeCompanionAnalyzerFileRaw.Filename)%(_ScribeCompanionAnalyzerFileRaw.Extension)%3B'))" />
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="@(_ScribeCompanionAnalyzerFile)"
+            Pack="true"
+            PackagePath="analyzers/dotnet/cs"
+            Visible="false" />
+    </ItemGroup>
+  </Target>
+</Project>

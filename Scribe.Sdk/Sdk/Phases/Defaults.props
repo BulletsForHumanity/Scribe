@@ -1,0 +1,43 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 02: Universal Defaults (Early Phase)
+
+      Universal defaults that apply to every ScribeSdkProjectType. All are
+      overridable by the consuming .csproj (this file imports before the user's
+      PropertyGroups are evaluated).
+
+      Per-type defaults live next to per-type logic in the matching <Type>.targets
+      phase (Library / Companion / Analyzer / Meta). Because $(ScribeSdkProjectType)
+      is declared in the consumer .csproj, type-conditioned properties cannot be
+      evaluated in .props and must be set during the .targets phase.
+  -->
+
+  <PropertyGroup>
+    <!-- Roslyn compiler host requires netstandard2.0 for analyzers/generators.
+         Libraries that run outside the compiler host (e.g. shippable net10.0 lib)
+         can override this in their .csproj. -->
+    <TargetFramework Condition="'$(TargetFramework)' == '' and '$(TargetFrameworks)' == ''">netstandard2.0</TargetFramework>
+
+    <!-- Modern C# features, enabled by Stubs.cs polyfills on netstandard2.0. -->
+    <LangVersion Condition="'$(LangVersion)' == ''">14</LangVersion>
+
+    <!-- Nullable reference types by default. -->
+    <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
+
+    <!-- Catches common analyzer authoring mistakes (e.g. RS1035). -->
+    <EnforceExtendedAnalyzerRules Condition="'$(EnforceExtendedAnalyzerRules)' == ''">true</EnforceExtendedAnalyzerRules>
+
+    <!-- Embed PDB into the DLL for IDE stepping. No separate .snupkg. -->
+    <IncludeSymbols Condition="'$(IncludeSymbols)' == ''">false</IncludeSymbols>
+    <DebugType Condition="'$(DebugType)' == ''">embedded</DebugType>
+
+    <!-- Analyzer/Companion DLLs are bundled — their XML docs aren't useful. -->
+    <GenerateDocumentationFile Condition="'$(GenerateDocumentationFile)' == ''">false</GenerateDocumentationFile>
+
+    <!-- NU5128: expected when lib/ is empty (Companion/Analyzer/Meta pack to analyzers/). -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+
+    <!-- Enable Stubs.cs injection by default. Consumers can opt out. -->
+    <ScribeSdkIncludeStubs Condition="'$(ScribeSdkIncludeStubs)' == ''">true</ScribeSdkIncludeStubs>
+  </PropertyGroup>
+</Project>

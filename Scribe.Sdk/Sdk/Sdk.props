@@ -1,64 +1,46 @@
 <Project>
   <!--
-      BulletsForHumanity.Scribe.Sdk — Early Phase (Sdk.props)
+      BulletsForHumanity.Scribe.Sdk — Entry point (early phase)
 
-      Sets default properties for Roslyn analyzer/source generator projects.
-      Chains to the standard Microsoft.NET.Sdk. All properties set here can be
-      overridden by the consuming project file.
+      Thin wrapper: chains to Microsoft.NET.Sdk, imports the Defaults phase,
+      and imports LocalDev (consumer-side infrastructure activates here so
+      restore sees the local packages source).
 
-      Usage:
+      Usage in a consuming .csproj:
         <Project Sdk="BulletsForHumanity.Scribe.Sdk">
-          <ItemGroup>
-            <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
-          </ItemGroup>
+          <PropertyGroup>
+            <ScribeSdkProjectType>Library | Companion | Analyzer | Meta</ScribeSdkProjectType>
+          </PropertyGroup>
+          ...
         </Project>
 
       Requires a global.json entry for SDK resolution:
-        {
-          "msbuild-sdks": {
-            "BulletsForHumanity.Scribe.Sdk": "<version>"
-          }
-        }
+        { "msbuild-sdks": { "BulletsForHumanity.Scribe.Sdk": "<version>" } }
+
+      Phase layout (by evaluation order):
+        Sdk.props
+          Microsoft.NET.Sdk (.props)
+          Phases/Defaults.props             — universal overridable defaults
+          build/Scribe.LocalDev.props       — consumer-side LocalDev infra
+        <user .csproj body>
+        Sdk.targets
+          Microsoft.NET.Sdk (.targets)
+          Phases/Classification.targets     — compute _IsScribeX flags
+          Phases/Validation.targets         — fail if ScribeSdkProjectType missing/invalid
+          Phases/Stubs.targets              — inject Stubs.cs polyfills
+          Phases/Library.targets            — Library type + companion embedding
+          Phases/Companion.targets          — Companion type + GetAnalyzerFiles
+          Phases/Analyzer.targets           — Analyzer (standalone) type
+          Phases/Meta.targets               — Meta type + auto-pack + override
+          build/Scribe.LocalDev.targets     — producer-side LocalDev infra
   -->
 
-  <!-- Chain to the standard .NET SDK (early phase). -->
+  <!-- Chain to the standard .NET SDK. -->
   <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
 
-  <!-- ── Analyzer/Generator Project Defaults ───────────────────────────── -->
-  <!-- These can be overridden in the consuming .csproj. -->
-  <PropertyGroup>
-    <!-- Roslyn compiler host requires netstandard2.0. -->
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <!-- Modern C# features, enabled by Stubs.cs polyfills. -->
-    <LangVersion>14</LangVersion>
-    <!-- Catches common analyzer authoring mistakes at compile time (e.g. RS1035). -->
-    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <!-- Analyzer DLL goes into analyzers/dotnet/cs/, not lib/. -->
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <!-- Marks the NuGet package as an analyzer package. -->
-    <PackageType>Analyzer</PackageType>
-    <!-- Embed PDB into the DLL for IDE debugging. No separate .snupkg needed. -->
-    <IncludeSymbols>false</IncludeSymbols>
-    <DebugType>embedded</DebugType>
-    <!-- Enable nullable reference types for modern null-safety. -->
-    <Nullable>enable</Nullable>
-    <!-- Disable doc XML file — analyzer DLLs are bundled, not referenced directly. -->
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <!-- NU5128: expected warning when lib/ is empty (due to IncludeBuildOutput=false). -->
-    <NoWarn>$(NoWarn);NU5128</NoWarn>
-    <!-- Copy NuGet dependency DLLs to output so they can be bundled into the analyzer package. -->
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
+  <!-- Universal defaults (early phase, overridable by consumer .csproj). -->
+  <Import Project="$(MSBuildThisFileDirectory)Phases\Defaults.props" />
 
-  <!-- ── Stubs Opt-Out ─────────────────────────────────────────────────── -->
-  <!-- Consumers can set ScribeSdkIncludeStubs=false to skip Stubs.cs injection. -->
-  <PropertyGroup Condition="'$(ScribeSdkIncludeStubs)' == ''">
-    <ScribeSdkIncludeStubs>true</ScribeSdkIncludeStubs>
-  </PropertyGroup>
-
-  <!-- ── Solution-Local Analyzer Infrastructure (Early Phase) ──────────── -->
-  <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.SolutionAnalyzer.props" />
-
-  <!-- ── LocalDev Infrastructure (Early Phase) ─────────────────────────── -->
+  <!-- LocalDev consumer-side infrastructure (must be visible to restore). -->
   <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.LocalDev.props" />
 </Project>

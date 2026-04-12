@@ -1,5 +1,7 @@
 <Solution>
   <Project Path="Scribe/Scribe.csproj" />
+  <Project Path="Scribe.Ink/Scribe.Ink.csproj" />
+  <Project Path="Scribe.Scriptorium/Scribe.Scriptorium.csproj" />
   <Project Path="Scribe.Sdk/Scribe.Sdk.csproj" />
   <Project Path="Scribe.Tests/Scribe.Tests.csproj" />
 </Solution>

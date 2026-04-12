@@ -1,0 +1,45 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 08: Analyzer (standalone)
+
+      A standalone Analyzer ships as its own NuGet package with PackageType
+      =Analyzer. Its own DLL and private NuGet dependencies land in
+      analyzers/dotnet/cs/ — no lib/ folder.
+
+      This is the shape produced by today's Sdk defaults. Use it only when the
+      analyzer is genuinely independent of any host library; otherwise prefer
+      Companion + Library.
+  -->
+
+  <!-- ── Analyzer defaults ───────────────────────────────────────────────── -->
+  <PropertyGroup Condition="'$(_IsScribeAnalyzer)' == 'true'">
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <PackageType>Analyzer</PackageType>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- ── Own DLL into analyzers/dotnet/cs/ ───────────────────────────────── -->
+  <Target Name="_ScribeSdkAddAnalyzerDll"
+          BeforeTargets="_GetPackageFiles"
+          Condition="'$(_IsScribeAnalyzer)' == 'true'">
+    <ItemGroup>
+      <None Include="$(TargetPath)"
+            Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- ── Private dependency DLLs into analyzers/dotnet/cs/ ───────────────── -->
+  <Target Name="_ScribeSdkAddAnalyzerDependencies"
+          BeforeTargets="_GetPackageFiles"
+          DependsOnTargets="ResolvePackageAssets"
+          Condition="'$(_IsScribeAnalyzer)' == 'true'">
+    <ItemGroup>
+      <_ScribeSdkDep Include="@(ReferenceCopyLocalPaths)"
+                     Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
+                                and '$([System.String]::Copy(&quot;%(ReferenceCopyLocalPaths.NuGetPackageId)&quot;).StartsWith(&quot;Microsoft.CodeAnalysis&quot;))' != 'True'
+                                and '%(Extension)' == '.dll'" />
+      <None Include="@(_ScribeSdkDep)"
+            Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,77 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 07: Companion
+
+      A Companion is an analyzer / generator / code-fixer that ships *inside*
+      its host Library's nupkg. It never produces a NuGet package of its own.
+
+      Companions are harvested by the Library's _ScribeSdkEmbedCompanions target
+      (Phase 06) which invokes GetAnalyzerFiles here and pins the results into
+      analyzers/dotnet/cs/ of the Library's package.
+
+      Companions may also be consumed in-solution by siblings (e.g. a Fixes
+      companion referencing a Logos companion) via <ProjectReference
+      OutputItemType="Analyzer">. GetDependencyTargetPaths exposes the
+      companion's private dependency DLLs via TargetPathWithTargetPlatformMoniker
+      so Roslyn's AssemblyLoadContext resolves them.
+
+      Usage in a Companion .csproj:
+        <PropertyGroup>
+          <ScribeSdkProjectType>Companion</ScribeSdkProjectType>
+          <ScribeSdkHost>MyOrg.MyLib</ScribeSdkHost>  <!-- metadata only -->
+        </PropertyGroup>
+  -->
+
+  <!-- ── Companion defaults ──────────────────────────────────────────────── -->
+  <PropertyGroup Condition="'$(_IsScribeCompanion)' == 'true'">
+    <!-- Companion DLL lives in analyzers/dotnet/cs/ of the host's package. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- Companions never produce their own nupkg. -->
+    <IsPackable>false</IsPackable>
+    <!-- Bundle private NuGet dependencies into ReferenceCopyLocalPaths so
+         GetAnalyzerFiles can harvest them. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- Expose private deps to in-solution ProjectReference consumers. -->
+    <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+  </PropertyGroup>
+
+  <!-- ── GetAnalyzerFiles ────────────────────────────────────────────────── -->
+  <!--
+      Returns the set of DLLs that should land in analyzers/dotnet/cs/ of the
+      host Library's package: the companion's own assembly plus every NuGet-
+      sourced runtime dependency, minus the Roslyn host assemblies (which are
+      already in the compiler's load context — bundling them causes version
+      conflicts at analyze time).
+  -->
+  <Target Name="GetAnalyzerFiles"
+          Condition="'$(_IsScribeCompanion)' == 'true'"
+          DependsOnTargets="ResolveAssemblyReferences"
+          Returns="@(_AnalyzerFile)">
+    <ItemGroup>
+      <_AnalyzerFile Include="$(OutputPath)$(AssemblyName).dll" />
+      <_AnalyzerFile Include="@(ReferenceCopyLocalPaths)"
+                     Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
+                                and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.Common'
+                                and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.CSharp'
+                                and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.CSharp.Workspaces'
+                                and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.Workspaces.Common'
+                                and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'System.Collections.Immutable'
+                                and '%(Extension)' == '.dll'" />
+    </ItemGroup>
+  </Target>
+
+  <!-- ── GetDependencyTargetPaths ────────────────────────────────────────── -->
+  <!--
+      In-solution ProjectReference consumer path. When a sibling project uses
+      <ProjectReference OutputItemType="Analyzer"> to this companion, Roslyn's
+      AssemblyLoadContext needs private dependency DLLs alongside the main one.
+      TargetPathWithTargetPlatformMoniker carries them across the reference
+      boundary.
+  -->
+  <Target Name="GetDependencyTargetPaths" Condition="'$(_IsScribeCompanion)' == 'true'">
+    <ItemGroup>
+      <TargetPathWithTargetPlatformMoniker Include="@(ReferenceCopyLocalPaths)"
+                                           IncludeRuntimeDependency="false" />
+    </ItemGroup>
+  </Target>
+</Project>
