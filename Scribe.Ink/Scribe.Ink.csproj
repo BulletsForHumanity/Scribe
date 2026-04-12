@@ -1,26 +1,14 @@
-<!--
-    TODO(dogfood): switch to <Project Sdk="BulletsForHumanity.Scribe.Sdk"> once the
-    Sdk's project-types support lands (see SCRIBE_SDK_PROJECT_TYPES_REQS.md).
-    Until then, use Microsoft.NET.Sdk with the same settings Scribe.Sdk's Sdk.props applies.
--->
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="BulletsForHumanity.Scribe.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <LangVersion>14</LangVersion>
-    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <PackageType>Analyzer</PackageType>
-    <IncludeSymbols>false</IncludeSymbols>
-    <DebugType>embedded</DebugType>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <ScribeSdkProjectType>Analyzer</ScribeSdkProjectType>
+    <ImplicitUsings>enable</ImplicitUsings>
     <!--
         RS1038: Workspaces-referencing assembly hosting an analyzer. We split usage
         by class (analyzers don't touch Workspaces types; fixers do), so the Roslyn
         host loads both happily. The blanket rule is conservative, so suppress it.
         RS2008: analyzer release tracking is overkill for a small, versioned package.
     -->
-    <NoWarn>$(NoWarn);NU5128;RS1038;RS2008</NoWarn>
+    <NoWarn>$(NoWarn);RS1038;RS2008</NoWarn>
     <PackageId>BulletsForHumanity.Scribe.Ink</PackageId>
     <Description>Roslyn analyzers, code fix providers, and source generators for Scribe shapes. The scribe dips the quill in ink to mark, correct, and emend.</Description>
     <PackageTags>roslyn;analyzer;code-fix;source-generator;scribe</PackageTags>

@@ -1,23 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="BulletsForHumanity.Scribe.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <LangVersion>14</LangVersion>
-    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <IncludeSourceGeneratorAttributes>false</IncludeSourceGeneratorAttributes>
+    <ScribeSdkProjectType>Library</ScribeSdkProjectType>
     <!--
         Scribe is a class library consumed by analyzer projects.
         It is NOT an analyzer itself — it provides shared source-generation utilities.
-        Consuming analyzer packages must bundle the Scribe DLL alongside their own output
-        (e.g. via CopyLocalLockFileAssemblies + custom packaging targets).
+        Consuming analyzer packages bundle the Scribe DLL alongside their own output.
     -->
-    <!-- Embed PDB directly so IDE tooling can step through Scribe source. -->
-    <IncludeSymbols>false</IncludeSymbols>
-    <DebugType>embedded</DebugType>
-    <!-- NU5128: no DLL in lib/ — expected, Scribe is bundled into analyzer packages. -->
-    <NoWarn>$(NoWarn);NU5128</NoWarn>
-    <!-- Disable doc XML file — Scribe is bundled into analyzer assemblies, not consumed directly.
-         The .xml file would otherwise be picked up as metadata by downstream references. -->
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IncludeSourceGeneratorAttributes>false</IncludeSourceGeneratorAttributes>
+    <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>BulletsForHumanity.Scribe</PackageId>
     <Description>Fluent source-generation utilities for Roslyn incremental generators. Provides Quill (fluent source builder), naming helpers, XML doc extraction, and well-known BCL type constants.</Description>
   </PropertyGroup>
@@ -30,14 +20,6 @@
   <ItemGroup>
     <None Include="..\LICENSE" Pack="true" PackagePath="" />
     <None Include="..\README.md" Pack="true" PackagePath="" />
-    <!-- Ship LocalDev build infrastructure so consumers get it via NuGet.
-         The BulletsForHumanity.Scribe.* wrappers are the NuGet auto-import entry points.
-         The Scribe.LocalDev.* files contain the actual logic and are also importable
-         directly from a sibling repo checkout. -->
-    <None Include="build\BulletsForHumanity.Scribe.props" Pack="true" PackagePath="build" />
-    <None Include="build\BulletsForHumanity.Scribe.targets" Pack="true" PackagePath="build" />
-    <None Include="build\Scribe.LocalDev.props" Pack="true" PackagePath="build" />
-    <None Include="build\Scribe.LocalDev.targets" Pack="true" PackagePath="build" />
   </ItemGroup>
 
   <ItemGroup>

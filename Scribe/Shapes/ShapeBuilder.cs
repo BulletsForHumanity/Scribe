@@ -404,6 +404,389 @@ public sealed partial class ShapeBuilder
     }
 
     // ───────────────────────────────────────────────────────────────
+    //  Phase 8.5 — negations of positive primitives
+    // ───────────────────────────────────────────────────────────────
+
+    /// <summary>Forbid the <c>partial</c> modifier on the type.</summary>
+    public ShapeBuilder MustNotBePartial(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE013",
+            defaultTitle: "Type must not be partial",
+            defaultMessage: "Type '{0}' must not be declared 'partial'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.RemovePartialModifier,
+            predicate: static (sym, _, ct) => !IsPartial(sym, ct),
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid the <c>sealed</c> modifier on the type.</summary>
+    public ShapeBuilder MustNotBeSealed(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE014",
+            defaultTitle: "Type must not be sealed",
+            defaultMessage: "Type '{0}' must not be declared 'sealed'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.RemoveSealedModifier,
+            // Value types and static classes are implicitly sealed — ignore them
+            // so this check only flags explicit 'sealed' on classes that could be unsealed.
+            predicate: static (sym, _, _) => !sym.IsSealed || sym.IsValueType || sym.IsStatic,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid attribute <typeparamref name="T"/> on the type.</summary>
+    public ShapeBuilder MustNotHaveAttribute<T>(DiagnosticSpec? spec = null)
+        where T : System.Attribute
+        => MustNotHaveAttribute(typeof(T).FullName!, spec);
+
+    /// <summary>Forbid the attribute named by <paramref name="metadataName"/>.</summary>
+    public ShapeBuilder MustNotHaveAttribute(string metadataName, DiagnosticSpec? spec = null)
+    {
+        if (string.IsNullOrEmpty(metadataName))
+        {
+            throw new ArgumentException("Metadata name must not be empty.", nameof(metadataName));
+        }
+
+        var interned = InternPool.Intern(metadataName);
+        AddCheck(
+            defaultId: "SCRIBE015",
+            defaultTitle: "Type must not carry forbidden attribute",
+            defaultMessage: "Type '{0}' must not be annotated with '[{1}]'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.AttributeList,
+            defaultFix: FixKind.RemoveAttribute,
+            predicate: (sym, _, _) => !HasAttribute(sym, interned),
+            messageArgs: sym => EquatableArray.Create(sym.Name, interned),
+            spec: spec,
+            fixProperties: _ => ImmutableDictionary<string, string?>.Empty
+                .Add("attribute", interned));
+        return this;
+    }
+
+    /// <summary>
+    ///     Forbid the type's <see cref="ISymbol.Name"/> from matching <paramref name="pattern"/>.
+    ///     No auto-fix — renaming is a cross-file operation outside Scribe's automation surface.
+    /// </summary>
+    public ShapeBuilder MustNotBeNamed(string pattern, DiagnosticSpec? spec = null)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            throw new ArgumentException("Pattern must not be empty.", nameof(pattern));
+        }
+
+        var regex = new Regex(pattern, RegexOptions.CultureInvariant);
+        AddCheck(
+            defaultId: "SCRIBE016",
+            defaultTitle: "Type name must not match forbidden pattern",
+            defaultMessage: "Type '{0}' name matches forbidden pattern '{1}'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.Identifier,
+            defaultFix: FixKind.None,
+            predicate: (sym, _, _) => !regex.IsMatch(sym.Name),
+            messageArgs: sym => EquatableArray.Create(sym.Name, pattern),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid the <c>static</c> modifier on the type.</summary>
+    public ShapeBuilder MustNotBeStatic(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE017",
+            defaultTitle: "Type must not be static",
+            defaultMessage: "Type '{0}' must not be declared 'static'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.RemoveStaticModifier,
+            predicate: static (sym, _, _) => !sym.IsStatic,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid the type from extending <typeparamref name="T"/>.</summary>
+    public ShapeBuilder MustNotExtend<T>(DiagnosticSpec? spec = null)
+        where T : class
+        => MustNotExtend(typeof(T).FullName!, spec);
+
+    /// <summary>Forbid the type from extending the base class named by <paramref name="metadataName"/>.</summary>
+    public ShapeBuilder MustNotExtend(string metadataName, DiagnosticSpec? spec = null)
+    {
+        if (string.IsNullOrEmpty(metadataName))
+        {
+            throw new ArgumentException("Metadata name must not be empty.", nameof(metadataName));
+        }
+
+        var interned = InternPool.Intern(metadataName);
+        AddCheck(
+            defaultId: "SCRIBE018",
+            defaultTitle: "Type must not extend forbidden base class",
+            defaultMessage: "Type '{0}' must not extend base class '{1}'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.BaseList,
+            defaultFix: FixKind.RemoveFromBaseList,
+            predicate: (sym, compilation, _) => !ExtendsByMetadataName(sym, compilation, interned),
+            messageArgs: sym => EquatableArray.Create(sym.Name, interned),
+            spec: spec,
+            fixProperties: _ => ImmutableDictionary<string, string?>.Empty
+                .Add("baseClass", interned));
+        return this;
+    }
+
+    /// <summary>
+    ///     Forbid the type's containing namespace from matching <paramref name="pattern"/>.
+    ///     No auto-fix — moving a file is outside Scribe's automation surface.
+    /// </summary>
+    public ShapeBuilder MustNotBeInNamespace(string pattern, DiagnosticSpec? spec = null)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            throw new ArgumentException("Pattern must not be empty.", nameof(pattern));
+        }
+
+        var regex = new Regex(pattern, RegexOptions.CultureInvariant);
+        AddCheck(
+            defaultId: "SCRIBE019",
+            defaultTitle: "Type must not be in forbidden namespace",
+            defaultMessage: "Type '{0}' is in namespace '{1}' which matches forbidden pattern '{2}'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ContainingNamespace,
+            defaultFix: FixKind.None,
+            predicate: (sym, _, _) => !regex.IsMatch(sym.ContainingNamespace?.ToDisplayString() ?? string.Empty),
+            messageArgs: sym => EquatableArray.Create(
+                sym.Name,
+                sym.ContainingNamespace?.ToDisplayString() ?? string.Empty,
+                pattern),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Require the type to declare at least one generic type parameter.</summary>
+    public ShapeBuilder MustBeGeneric(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE020",
+            defaultTitle: "Type must be generic",
+            defaultMessage: "Type '{0}' must declare at least one generic type parameter",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.Identifier,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.IsGenericType,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    // ───────────────────────────────────────────────────────────────
+    //  Phase 8.5 — visibility
+    // ───────────────────────────────────────────────────────────────
+
+    /// <summary>Require the type to be declared <c>public</c>.</summary>
+    public ShapeBuilder MustBePublic(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE021",
+            defaultTitle: "Type must be public",
+            defaultMessage: "Type '{0}' must be declared 'public'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.SetVisibility,
+            predicate: static (sym, _, _) => sym.DeclaredAccessibility == Accessibility.Public,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec,
+            fixProperties: _ => ImmutableDictionary<string, string?>.Empty
+                .Add("visibility", "public"));
+        return this;
+    }
+
+    /// <summary>Require the type to be declared <c>internal</c>.</summary>
+    public ShapeBuilder MustBeInternal(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE022",
+            defaultTitle: "Type must be internal",
+            defaultMessage: "Type '{0}' must be declared 'internal'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.SetVisibility,
+            predicate: static (sym, _, _) => sym.DeclaredAccessibility == Accessibility.Internal,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec,
+            fixProperties: _ => ImmutableDictionary<string, string?>.Empty
+                .Add("visibility", "internal"));
+        return this;
+    }
+
+    /// <summary>
+    ///     Require a nested type to be declared <c>private</c>. Top-level types cannot be
+    ///     <c>private</c> — use <see cref="MustBeInternal"/> for that case.
+    /// </summary>
+    public ShapeBuilder MustBePrivate(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE023",
+            defaultTitle: "Type must be private",
+            defaultMessage: "Type '{0}' must be declared 'private'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.SetVisibility,
+            predicate: static (sym, _, _) => sym.DeclaredAccessibility == Accessibility.Private,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec,
+            fixProperties: _ => ImmutableDictionary<string, string?>.Empty
+                .Add("visibility", "private"));
+        return this;
+    }
+
+    /// <summary>Forbid the <c>public</c> visibility modifier on the type.</summary>
+    public ShapeBuilder MustNotBePublic(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE024",
+            defaultTitle: "Type must not be public",
+            defaultMessage: "Type '{0}' must not be declared 'public'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.DeclaredAccessibility != Accessibility.Public,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid the <c>internal</c> visibility modifier on the type.</summary>
+    public ShapeBuilder MustNotBeInternal(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE025",
+            defaultTitle: "Type must not be internal",
+            defaultMessage: "Type '{0}' must not be declared 'internal'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.DeclaredAccessibility != Accessibility.Internal,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid the <c>private</c> visibility modifier on the type.</summary>
+    public ShapeBuilder MustNotBePrivate(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE026",
+            defaultTitle: "Type must not be private",
+            defaultMessage: "Type '{0}' must not be declared 'private'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.ModifierList,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.DeclaredAccessibility != Accessibility.Private,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    // ───────────────────────────────────────────────────────────────
+    //  Phase 8.5 — declaration kind
+    // ───────────────────────────────────────────────────────────────
+
+    /// <summary>Require the type to be a <c>record</c> (class-record or record-struct).</summary>
+    public ShapeBuilder MustBeRecord(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE027",
+            defaultTitle: "Type must be a record",
+            defaultMessage: "Type '{0}' must be declared as a 'record'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.TypeKeyword,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.IsRecord,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid the <c>record</c> keyword on the type.</summary>
+    public ShapeBuilder MustNotBeRecord(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE028",
+            defaultTitle: "Type must not be a record",
+            defaultMessage: "Type '{0}' must not be declared as a 'record'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.TypeKeyword,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => !sym.IsRecord,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Require the type to be a value type (<c>struct</c> or <c>record struct</c>).</summary>
+    public ShapeBuilder MustBeValueType(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE029",
+            defaultTitle: "Type must be a value type",
+            defaultMessage: "Type '{0}' must be a value type",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.TypeKeyword,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.IsValueType,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>Forbid the type from being a value type.</summary>
+    public ShapeBuilder MustNotBeValueType(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE030",
+            defaultTitle: "Type must not be a value type",
+            defaultMessage: "Type '{0}' must not be a value type",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.TypeKeyword,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => !sym.IsValueType,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    // ───────────────────────────────────────────────────────────────
+    //  Phase 8.5 — constructors
+    // ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Require a public parameterless constructor. Satisfied by the implicit
+    ///     default constructor on classes with no other instance constructors; for
+    ///     value types the default ctor is always present. Primary constructors on
+    ///     records and structs are not considered parameterless.
+    /// </summary>
+    public ShapeBuilder MustHaveParameterlessConstructor(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE031",
+            defaultTitle: "Type must have a public parameterless constructor",
+            defaultMessage: "Type '{0}' must declare a public parameterless constructor",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.Identifier,
+            defaultFix: FixKind.AddParameterlessConstructor,
+            predicate: static (sym, _, _) => HasPublicParameterlessCtor(sym),
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    // ───────────────────────────────────────────────────────────────
     //  Predicate helpers (static, closure-free)
     // ───────────────────────────────────────────────────────────────
 
@@ -463,6 +846,34 @@ public sealed partial class ShapeBuilder
             }
 
             current = current.BaseType;
+        }
+
+        return false;
+    }
+
+    private static bool HasPublicParameterlessCtor(INamedTypeSymbol symbol)
+    {
+        // Value types always have a default parameterless constructor.
+        if (symbol.IsValueType)
+        {
+            return true;
+        }
+
+        // Static classes never need a constructor.
+        if (symbol.IsStatic)
+        {
+            return true;
+        }
+
+        // Roslyn surfaces the compiler-synthesised public default constructor in
+        // InstanceConstructors, so a single check covers implicit + explicit ctors.
+        foreach (var ctor in symbol.InstanceConstructors)
+        {
+            if (ctor.Parameters.Length == 0
+                && ctor.DeclaredAccessibility == Accessibility.Public)
+            {
+                return true;
+            }
         }
 
         return false;

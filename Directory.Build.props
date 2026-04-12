@@ -12,6 +12,10 @@
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
     <!-- CA1707: test method names use underscores by convention.
          RS2008: release tracking applies to analyzer projects, not test projects that
                  happen to construct DiagnosticDescriptor instances for assertions. -->
@@ -35,16 +39,14 @@
     <ArtifactsPath>$(MSBuildThisFileDirectory).artifacts/</ArtifactsPath>
   </PropertyGroup>
 
-  <!-- Language and quality defaults. -->
+  <!-- Language and quality defaults. TargetFramework and LangVersion are set by
+       each project (or inherited from the Scribe SDK's Defaults.props for
+       analyzer/library projects). -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <WarningsAsErrors>nullable</WarningsAsErrors>
     <AnalysisMode>Recommended</AnalysisMode>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <EnablePreviewFeatures>true</EnablePreviewFeatures>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);NU1507;CS1591</NoWarn>
   </PropertyGroup>

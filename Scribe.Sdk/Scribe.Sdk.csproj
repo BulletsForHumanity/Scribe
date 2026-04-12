@@ -9,6 +9,8 @@
   <PropertyGroup>
     <PackageId>BulletsForHumanity.Scribe.Sdk</PackageId>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Manual override: netstandard2.0 defaults to C# 7.3 but content/Stubs.cs uses init-only setters and nullable. -->
+    <LangVersion>latest</LangVersion>
     <!-- No build output — this is a pure SDK package. -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>

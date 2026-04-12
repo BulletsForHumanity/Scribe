@@ -18,7 +18,7 @@
       Usage in a Companion .csproj:
         <PropertyGroup>
           <ScribeSdkProjectType>Companion</ScribeSdkProjectType>
-          <ScribeSdkHost>MyOrg.MyLib</ScribeSdkHost>  <!-- metadata only -->
+          <ScribeSdkHost>MyOrg.MyLib</ScribeSdkHost>  (metadata only)
         </PropertyGroup>
   -->
 
