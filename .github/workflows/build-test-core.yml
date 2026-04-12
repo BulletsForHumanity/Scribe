@@ -71,7 +71,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Restore
-        run: dotnet restore Scribe.slnx
+        run: dotnet restore Scribe.slnx -p:Configuration=Release
 
       - name: Build
         run: dotnet build Scribe.slnx --configuration Release --no-restore

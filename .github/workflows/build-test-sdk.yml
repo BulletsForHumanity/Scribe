@@ -67,7 +67,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Restore
-        run: dotnet restore Scribe.Sdk/Scribe.Sdk.csproj
+        run: dotnet restore Scribe.Sdk/Scribe.Sdk.csproj -p:Configuration=Release
 
       - name: Build
         run: dotnet build Scribe.Sdk/Scribe.Sdk.csproj --configuration Release --no-restore
