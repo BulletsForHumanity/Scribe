@@ -19,8 +19,8 @@ namespace Scribe.Tests.Shapes;
 
 /// <summary>
 ///     Exercises the Phase 8.5 additions to the <c>MustBe*</c>/<c>MustNot*</c>
-///     catalog: direct negations (SCRIBE013–020), visibility (SCRIBE021–026),
-///     declaration kind (SCRIBE027–030), and parameterless constructor
+///     catalog: direct negations (SCRIBE002–020), visibility (SCRIBE011–026),
+///     declaration kind (SCRIBE019–030), and parameterless constructor
 ///     (SCRIBE031), along with the matching fix implementations.
 /// </summary>
 public class ShapePhase8_5Tests
@@ -32,7 +32,7 @@ public class ShapePhase8_5Tests
     // ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void MustNotBePartial_emits_SCRIBE013_with_RemovePartialModifier_fix()
+    public void MustNotBePartial_emits_SCRIBE002_with_RemovePartialModifier_fix()
     {
         var shape = Shape.Class()
             .MustNotBePartial()
@@ -40,7 +40,7 @@ public class ShapePhase8_5Tests
 
         var diagnostics = RunAnalyzer(shape, "public partial class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE013");
+        diagnostics[0].Id.ShouldBe("SCRIBE002");
         diagnostics[0].Properties["fixKind"].ShouldBe("RemovePartialModifier");
     }
 
@@ -57,7 +57,7 @@ public class ShapePhase8_5Tests
     }
 
     [Fact]
-    public void MustNotBeSealed_emits_SCRIBE014_with_RemoveSealedModifier_fix()
+    public void MustNotBeSealed_emits_SCRIBE006_with_RemoveSealedModifier_fix()
     {
         var shape = Shape.Class()
             .MustNotBeSealed()
@@ -65,7 +65,7 @@ public class ShapePhase8_5Tests
 
         var diagnostics = RunAnalyzer(shape, "public sealed class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE014");
+        diagnostics[0].Id.ShouldBe("SCRIBE006");
         diagnostics[0].Properties["fixKind"].ShouldBe("RemoveSealedModifier");
     }
 
@@ -82,7 +82,7 @@ public class ShapePhase8_5Tests
     }
 
     [Fact]
-    public void MustNotHaveAttribute_emits_SCRIBE015_with_RemoveAttribute_fix()
+    public void MustNotHaveAttribute_emits_SCRIBE004_with_RemoveAttribute_fix()
     {
         var shape = Shape.Class()
             .MustNotHaveAttribute("MarkerAttribute")
@@ -93,7 +93,7 @@ public sealed class MarkerAttribute : System.Attribute { }
 [Marker] public class Widget { }
 ";
         var diagnostics = RunAnalyzer(shape, source)
-            .Where(d => d.Id == "SCRIBE015")
+            .Where(d => d.Id == "SCRIBE004")
             .ToArray();
 
         diagnostics.Length.ShouldBe(1);
@@ -118,7 +118,7 @@ public sealed class MarkerAttribute : System.Attribute { }
     }
 
     [Fact]
-    public void MustNotBeNamed_emits_SCRIBE016_with_no_fix()
+    public void MustNotBeNamed_emits_SCRIBE030_with_no_fix()
     {
         var shape = Shape.Class()
             .MustNotBeNamed(@"^.*Impl$")
@@ -126,12 +126,12 @@ public sealed class MarkerAttribute : System.Attribute { }
 
         var diagnostics = RunAnalyzer(shape, "public class WidgetImpl { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE016");
+        diagnostics[0].Id.ShouldBe("SCRIBE030");
         diagnostics[0].Properties["fixKind"].ShouldBe("None");
     }
 
     [Fact]
-    public void MustNotBeStatic_emits_SCRIBE017_with_RemoveStaticModifier_fix()
+    public void MustNotBeStatic_emits_SCRIBE018_with_RemoveStaticModifier_fix()
     {
         var shape = Shape.Class()
             .MustNotBeStatic()
@@ -139,7 +139,7 @@ public sealed class MarkerAttribute : System.Attribute { }
 
         var diagnostics = RunAnalyzer(shape, "public static class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE017");
+        diagnostics[0].Id.ShouldBe("SCRIBE018");
         diagnostics[0].Properties["fixKind"].ShouldBe("RemoveStaticModifier");
     }
 
@@ -156,7 +156,7 @@ public sealed class MarkerAttribute : System.Attribute { }
     }
 
     [Fact]
-    public void MustNotExtend_emits_SCRIBE018_and_encodes_baseClass_for_fix()
+    public void MustNotExtend_emits_SCRIBE010_and_encodes_baseClass_for_fix()
     {
         var shape = Shape.Class()
             .MustHaveAttribute("MarkerAttribute")
@@ -169,7 +169,7 @@ public class MyBase { }
 [Marker] public class Widget : MyBase { }
 ";
         var diagnostics = RunAnalyzer(shape, source)
-            .Where(d => d.Id == "SCRIBE018")
+            .Where(d => d.Id == "SCRIBE010")
             .ToArray();
 
         diagnostics.Length.ShouldBe(1);
@@ -197,7 +197,7 @@ public class MyBase { }
     }
 
     [Fact]
-    public void MustNotBeInNamespace_emits_SCRIBE019_with_no_fix()
+    public void MustNotBeInNamespace_emits_SCRIBE028_with_no_fix()
     {
         var shape = Shape.Class()
             .MustNotBeInNamespace(@"^MyApp\.Legacy(\..*)?$")
@@ -206,12 +206,12 @@ public class MyBase { }
         var source = "namespace MyApp.Legacy { public class Widget { } }";
         var diagnostics = RunAnalyzer(shape, source);
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE019");
+        diagnostics[0].Id.ShouldBe("SCRIBE028");
         diagnostics[0].Properties["fixKind"].ShouldBe("None");
     }
 
     [Fact]
-    public void MustBeGeneric_emits_SCRIBE020_on_non_generic_class_with_no_fix()
+    public void MustBeGeneric_emits_SCRIBE023_on_non_generic_class_with_no_fix()
     {
         var shape = Shape.Class()
             .MustBeGeneric()
@@ -219,7 +219,7 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE020");
+        diagnostics[0].Id.ShouldBe("SCRIBE023");
         diagnostics[0].Properties["fixKind"].ShouldBe("None");
     }
 
@@ -238,7 +238,7 @@ public class MyBase { }
     // ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void MustBePublic_emits_SCRIBE021_with_SetVisibility_fix_and_visibility_property()
+    public void MustBePublic_emits_SCRIBE011_with_SetVisibility_fix_and_visibility_property()
     {
         var shape = Shape.Class()
             .MustBePublic()
@@ -246,7 +246,7 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shape, "internal class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE021");
+        diagnostics[0].Id.ShouldBe("SCRIBE011");
         diagnostics[0].Properties["fixKind"].ShouldBe("SetVisibility");
         diagnostics[0].Properties["visibility"].ShouldBe("public");
     }
@@ -264,7 +264,7 @@ public class MyBase { }
     }
 
     [Fact]
-    public void MustBeInternal_emits_SCRIBE022_with_SetVisibility_fix()
+    public void MustBeInternal_emits_SCRIBE013_with_SetVisibility_fix()
     {
         var shape = Shape.Class()
             .MustBeInternal()
@@ -272,7 +272,7 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE022");
+        diagnostics[0].Id.ShouldBe("SCRIBE013");
         diagnostics[0].Properties["visibility"].ShouldBe("internal");
     }
 
@@ -289,7 +289,7 @@ public class MyBase { }
     }
 
     [Fact]
-    public void MustNotBePublic_emits_SCRIBE024_with_no_fix()
+    public void MustNotBePublic_emits_SCRIBE012_with_no_fix()
     {
         var shape = Shape.Class()
             .MustNotBePublic()
@@ -297,7 +297,7 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE024");
+        diagnostics[0].Id.ShouldBe("SCRIBE012");
         diagnostics[0].Properties["fixKind"].ShouldBe("None");
     }
 
@@ -316,7 +316,7 @@ public class MyBase { }
     // ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void MustBeRecord_emits_SCRIBE027_on_plain_class_with_no_fix()
+    public void MustBeRecord_emits_SCRIBE019_on_plain_class_with_no_fix()
     {
         var shape = Shape.Class()
             .MustBeRecord()
@@ -324,7 +324,7 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE027");
+        diagnostics[0].Id.ShouldBe("SCRIBE019");
         diagnostics[0].Properties["fixKind"].ShouldBe("None");
     }
 
@@ -339,7 +339,7 @@ public class MyBase { }
     }
 
     [Fact]
-    public void MustNotBeRecord_emits_SCRIBE028_on_record()
+    public void MustNotBeRecord_emits_SCRIBE020_on_record()
     {
         var shape = Shape.Record()
             .MustNotBeRecord()
@@ -347,11 +347,11 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shape, "public record class Widget(int X);");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE028");
+        diagnostics[0].Id.ShouldBe("SCRIBE020");
     }
 
     [Fact]
-    public void MustBeValueType_emits_SCRIBE029_on_class_and_skips_struct()
+    public void MustBeValueType_emits_SCRIBE021_on_class_and_skips_struct()
     {
         var shape = Shape.Struct()
             .MustBeValueType()
@@ -365,11 +365,11 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shapeClass, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE029");
+        diagnostics[0].Id.ShouldBe("SCRIBE021");
     }
 
     [Fact]
-    public void MustNotBeValueType_emits_SCRIBE030_on_struct()
+    public void MustNotBeValueType_emits_SCRIBE022_on_struct()
     {
         var shape = Shape.Struct()
             .MustNotBeValueType()
@@ -377,7 +377,7 @@ public class MyBase { }
 
         var diagnostics = RunAnalyzer(shape, "public struct Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE030");
+        diagnostics[0].Id.ShouldBe("SCRIBE022");
     }
 
     // ───────────────────────────────────────────────────────────────

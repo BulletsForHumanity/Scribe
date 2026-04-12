@@ -53,12 +53,18 @@
   <Target Name="_ScribeSdkEmbedCompanions"
           BeforeTargets="_GetPackageFiles"
           Condition="'@(ScribeCompanion)' != ''">
+    <!-- BuildProjectReferences=false stops the companion's own Build from
+         recursing back into its host Library (the project currently packing).
+         The host is already built at this point; the inner Build just needs
+         to resolve the already-produced artifact. Without this flag, a
+         Companion that ProjectReferences its Library creates MSBuild cycle
+         MSB4006 during pack. -->
     <MSBuild Projects="@(ScribeCompanion)"
              Targets="Build"
-             Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false" />
+             Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false;BuildProjectReferences=false" />
     <MSBuild Projects="@(ScribeCompanion)"
              Targets="GetAnalyzerFiles"
-             Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false">
+             Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false;BuildProjectReferences=false">
       <Output TaskParameter="TargetOutputs" ItemName="_ScribeCompanionAnalyzerFileRaw" />
     </MSBuild>
     <!-- Deduplicate by filename. Multiple companions commonly pull in the same

@@ -78,7 +78,8 @@
     Condition="'$(IsLocalProducer)' == 'true'
                and '$(ScribesName)' != ''
                and '$(PackageId)' != ''
-               and '$(ScribeArtifactsDir)' != ''"
+               and '$(ScribeArtifactsDir)' != ''
+               and '$(IsPackable)' != 'false'"
   >
     <PropertyGroup>
       <_ScribeDevVersion>$(NuGetPackageVersion)</_ScribeDevVersion>

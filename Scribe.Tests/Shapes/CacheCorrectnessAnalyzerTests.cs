@@ -16,7 +16,7 @@ namespace Scribe.Tests.Shapes;
 ///     <c>ShapeBuilder.Project&lt;TModel&gt;</c> invocation with a <c>TModel</c>
 ///     that stores a Roslyn reference type (<c>ISymbol</c>, <c>SyntaxNode</c>,
 ///     <c>Compilation</c>, <c>SemanticModel</c>, <c>SyntaxTree</c>, <c>Location</c>,
-///     <c>AttributeData</c>) should emit SCRIBE101 pointing at the offending member.
+///     <c>AttributeData</c>) should emit SCRIBE200 pointing at the offending member.
 /// </summary>
 public class CacheCorrectnessAnalyzerTests
 {
@@ -41,7 +41,7 @@ public class Use
 ";
         var diagnostics = RunAnalyzer(source);
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE101");
+        diagnostics[0].Id.ShouldBe("SCRIBE200");
         diagnostics[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)
             .ShouldContain("Symbol");
         diagnostics[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)
@@ -72,7 +72,7 @@ public class Use
 ";
         var diagnostics = RunAnalyzer(source);
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE101");
+        diagnostics[0].Id.ShouldBe("SCRIBE200");
         diagnostics[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)
             .ShouldContain("Node");
         diagnostics[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture)
@@ -100,7 +100,7 @@ public class Use
 ";
         var diagnostics = RunAnalyzer(source);
         diagnostics.Length.ShouldBe(2);
-        diagnostics.Select(d => d.Id).ShouldAllBe(id => id == "SCRIBE101");
+        diagnostics.Select(d => d.Id).ShouldAllBe(id => id == "SCRIBE200");
         var messages = string.Join("|", diagnostics.Select(d => d.GetMessage(System.Globalization.CultureInfo.InvariantCulture)));
         messages.ShouldContain("Compilation");
         messages.ShouldContain("Location");
@@ -178,7 +178,7 @@ public class Use
 ";
         var diagnostics = RunAnalyzer(source);
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE101");
+        diagnostics[0].Id.ShouldBe("SCRIBE200");
     }
 
     private static ImmutableArray<Diagnostic> RunAnalyzer(string source)

@@ -24,7 +24,7 @@ namespace Scribe.Tests.Shapes;
 /// </summary>
 public class ShapeFixProviderTests
 {
-    private static readonly string[] _allThreeIds = ["SCRIBE001", "SCRIBE002", "SCRIBE003"];
+    private static readonly string[] _allThreeIds = ["SCRIBE001", "SCRIBE005", "SCRIBE007"];
 
     private readonly record struct Collected(string Fqn);
 

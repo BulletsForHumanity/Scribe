@@ -111,7 +111,7 @@ public class Widget { }
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE003");
+        diagnostics[0].Id.ShouldBe("SCRIBE007");
         diagnostics[0].Severity.ShouldBe(DiagnosticSeverity.Warning);
         diagnostics[0].Properties["interface"].ShouldBe("System.IDisposable");
     }

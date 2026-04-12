@@ -94,7 +94,7 @@ public class DiagnosticInfoTests
     {
         var a = new DiagnosticInfo("SCRIBE001", DiagnosticSeverity.Warning,
             EquatableArray<string>.Empty, null);
-        var b = new DiagnosticInfo("SCRIBE002", DiagnosticSeverity.Warning,
+        var b = new DiagnosticInfo("SCRIBE005", DiagnosticSeverity.Warning,
             EquatableArray<string>.Empty, null);
 
         a.ShouldNotBe(b);

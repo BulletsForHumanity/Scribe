@@ -27,10 +27,17 @@
   </ItemGroup>
 
   <!-- Scriptorium: build-time-only meta-generator. Emits Should*/Could*/ShouldNot*
-       variants of each Must* primitive on ShapeBuilder. Never ships. -->
+       variants of each Must* primitive on ShapeBuilder. In Debug, consumed via
+       the -dev.* NuGet package (VS analyzer hot-reload); in Release, via a
+       plain ProjectReference-Analyzer for CI-safe builds. -->
   <ItemGroup>
-    <ProjectReference Include="..\Scribe.Scriptorium\Scribe.Scriptorium.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
+    <ScribeMeta Include="..\Scribe.Scriptorium\Scribe.Scriptorium.csproj"
+                PackageId="BulletsForHumanity.Scribe.Scriptorium" />
+  </ItemGroup>
+
+  <!-- Scribe.Ink: Roslyn analyzers + code fixes. Embedded into the Scribe nupkg
+       at analyzers/dotnet/cs/ so consumers receive them automatically. -->
+  <ItemGroup>
+    <ScribeCompanion Include="..\Scribe.Ink\Scribe.Ink.csproj" />
   </ItemGroup>
 </Project>

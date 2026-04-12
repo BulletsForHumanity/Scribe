@@ -25,6 +25,9 @@
           Condition="'$(_IsScribeAnalyzer)' == 'true'" />
   <Import Project="$(MSBuildThisFileDirectory)Phases\Meta.targets"
           Condition="'$(_IsScribeMeta)' == 'true'" />
+  <!-- MetaConsumer is type-agnostic: any project (Library, Companion, Analyzer)
+       may declare <ScribeMeta> items to depend on a sibling Meta. -->
+  <Import Project="$(MSBuildThisFileDirectory)Phases\MetaConsumer.targets" />
 
   <!-- LocalDev producer-side infrastructure (override-file emission, cleanup). -->
   <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.LocalDev.targets" />

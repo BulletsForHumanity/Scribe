@@ -12,10 +12,11 @@
       that consuming projects resolve via a PackageVersion override emitted to
       $(ArtifactsPath)<PackageId>.Directory.Packages.targets.
 
-      Opt out of auto-pack with <IsPackable>false</IsPackable> — useful for
-      solution-internal Meta projects consumed purely via ProjectReference
-      that should never be packaged at all. The override-file emission is
-      also skipped.
+      Meta defaults to packable — solution-internal consumers still reference
+      the -dev.* nupkg (via the LocalDev override) rather than ProjectReference,
+      because Visual Studio's analyzer load context only refreshes cleanly on
+      PackageReference changes. Opt out with <IsPackable>false</IsPackable>
+      only for Meta projects nothing ever references as a package.
 
       The consumer's Directory.Build.targets must import override files via
       wildcard:
@@ -44,11 +45,10 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
 
-    <!-- Meta projects are solution-internal by default (consumed via ProjectReference).
-         Publishing across repos is opt-in with <IsPackable>true</IsPackable>. -->
-    <IsPackable Condition="'$(IsPackable)' == ''">false</IsPackable>
-    <!-- GeneratePackageOnBuild is gated on IsPackable and overridable by the consumer. -->
-    <GeneratePackageOnBuild Condition="'$(GeneratePackageOnBuild)' == ''">false</GeneratePackageOnBuild>
+    <!-- Meta always packs by default. Consumers (including in-solution siblings)
+         resolve the -dev.* package via LocalDev override, which is the path that
+         supports VS analyzer hot-refresh on code changes. -->
+    <IsPackable Condition="'$(IsPackable)' == ''">true</IsPackable>
   </PropertyGroup>
 
   <!-- ── Packable-only: timestamped version + auto-pack ──────────────────── -->
@@ -62,9 +62,13 @@
   </PropertyGroup>
 
   <!-- ── Artifacts directory (normalized with trailing slash) ────────────── -->
+  <!-- Only route PackageOutputPath to $(ArtifactsPath) when no stronger setter
+       has fired. LocalDev.props sets it to the shared $(ScribePackagesDir) in
+       producer mode — that must win so sibling consumers find the -dev.* pkg
+       via the Directory.Packages.targets override file. -->
   <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
     <_ScribeMetaArtifactsDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))</_ScribeMetaArtifactsDir>
-    <PackageOutputPath>$(_ScribeMetaArtifactsDir)packages\</PackageOutputPath>
+    <PackageOutputPath Condition="'$(PackageOutputPath)' == ''">$(_ScribeMetaArtifactsDir)packages\</PackageOutputPath>
   </PropertyGroup>
 
   <!-- Register the Meta packages directory as a NuGet source so restore finds

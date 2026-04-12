@@ -132,7 +132,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBeSealed(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE002",
+            defaultId: "SCRIBE005",
             defaultTitle: "Type must be sealed",
             defaultMessage: "Type '{0}' must be declared 'sealed'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -166,7 +166,7 @@ public sealed partial class ShapeBuilder
 
         var interned = InternPool.Intern(metadataName);
         AddCheck(
-            defaultId: "SCRIBE003",
+            defaultId: "SCRIBE007",
             defaultTitle: "Type must implement required interface",
             defaultMessage: "Type '{0}' must implement '{1}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -204,7 +204,7 @@ public sealed partial class ShapeBuilder
         _primaryAttributeMetadataName ??= interned;
 
         AddCheck(
-            defaultId: "SCRIBE004",
+            defaultId: "SCRIBE003",
             defaultTitle: "Type must have required attribute",
             defaultMessage: "Type '{0}' must be annotated with '[{1}]'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -233,7 +233,7 @@ public sealed partial class ShapeBuilder
 
         var regex = new Regex(pattern, RegexOptions.CultureInvariant);
         AddCheck(
-            defaultId: "SCRIBE005",
+            defaultId: "SCRIBE029",
             defaultTitle: "Type name must match required pattern",
             defaultMessage: "Type '{0}' name does not match pattern '{1}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -249,7 +249,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBeAbstract(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE006",
+            defaultId: "SCRIBE015",
             defaultTitle: "Type must be abstract",
             defaultMessage: "Type '{0}' must be declared 'abstract'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -265,7 +265,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBeStatic(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE007",
+            defaultId: "SCRIBE017",
             defaultTitle: "Type must be static",
             defaultMessage: "Type '{0}' must be declared 'static'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -297,7 +297,7 @@ public sealed partial class ShapeBuilder
 
         var interned = InternPool.Intern(metadataName);
         AddCheck(
-            defaultId: "SCRIBE008",
+            defaultId: "SCRIBE009",
             defaultTitle: "Type must extend required base class",
             defaultMessage: "Type '{0}' must extend base class '{1}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -325,7 +325,7 @@ public sealed partial class ShapeBuilder
 
         var regex = new Regex(pattern, RegexOptions.CultureInvariant);
         AddCheck(
-            defaultId: "SCRIBE009",
+            defaultId: "SCRIBE027",
             defaultTitle: "Type's namespace must match required pattern",
             defaultMessage: "Type '{0}' is in namespace '{1}' which does not match pattern '{2}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -344,7 +344,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBeAbstract(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE010",
+            defaultId: "SCRIBE016",
             defaultTitle: "Type must not be abstract",
             defaultMessage: "Type '{0}' must not be declared 'abstract'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -360,7 +360,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBeGeneric(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE011",
+            defaultId: "SCRIBE024",
             defaultTitle: "Type must not be generic",
             defaultMessage: "Type '{0}' must not declare generic type parameters",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -389,7 +389,7 @@ public sealed partial class ShapeBuilder
 
         var interned = InternPool.Intern(metadataName);
         AddCheck(
-            defaultId: "SCRIBE012",
+            defaultId: "SCRIBE008",
             defaultTitle: "Type must not implement forbidden interface",
             defaultMessage: "Type '{0}' must not implement '{1}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -411,7 +411,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBePartial(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE013",
+            defaultId: "SCRIBE002",
             defaultTitle: "Type must not be partial",
             defaultMessage: "Type '{0}' must not be declared 'partial'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -427,7 +427,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBeSealed(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE014",
+            defaultId: "SCRIBE006",
             defaultTitle: "Type must not be sealed",
             defaultMessage: "Type '{0}' must not be declared 'sealed'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -456,7 +456,7 @@ public sealed partial class ShapeBuilder
 
         var interned = InternPool.Intern(metadataName);
         AddCheck(
-            defaultId: "SCRIBE015",
+            defaultId: "SCRIBE004",
             defaultTitle: "Type must not carry forbidden attribute",
             defaultMessage: "Type '{0}' must not be annotated with '[{1}]'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -483,7 +483,7 @@ public sealed partial class ShapeBuilder
 
         var regex = new Regex(pattern, RegexOptions.CultureInvariant);
         AddCheck(
-            defaultId: "SCRIBE016",
+            defaultId: "SCRIBE030",
             defaultTitle: "Type name must not match forbidden pattern",
             defaultMessage: "Type '{0}' name matches forbidden pattern '{1}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -499,7 +499,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBeStatic(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE017",
+            defaultId: "SCRIBE018",
             defaultTitle: "Type must not be static",
             defaultMessage: "Type '{0}' must not be declared 'static'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -526,7 +526,7 @@ public sealed partial class ShapeBuilder
 
         var interned = InternPool.Intern(metadataName);
         AddCheck(
-            defaultId: "SCRIBE018",
+            defaultId: "SCRIBE010",
             defaultTitle: "Type must not extend forbidden base class",
             defaultMessage: "Type '{0}' must not extend base class '{1}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -553,7 +553,7 @@ public sealed partial class ShapeBuilder
 
         var regex = new Regex(pattern, RegexOptions.CultureInvariant);
         AddCheck(
-            defaultId: "SCRIBE019",
+            defaultId: "SCRIBE028",
             defaultTitle: "Type must not be in forbidden namespace",
             defaultMessage: "Type '{0}' is in namespace '{1}' which matches forbidden pattern '{2}'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -572,7 +572,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBeGeneric(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE020",
+            defaultId: "SCRIBE023",
             defaultTitle: "Type must be generic",
             defaultMessage: "Type '{0}' must declare at least one generic type parameter",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -592,7 +592,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBePublic(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE021",
+            defaultId: "SCRIBE011",
             defaultTitle: "Type must be public",
             defaultMessage: "Type '{0}' must be declared 'public'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -610,7 +610,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBeInternal(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE022",
+            defaultId: "SCRIBE013",
             defaultTitle: "Type must be internal",
             defaultMessage: "Type '{0}' must be declared 'internal'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -631,7 +631,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBePrivate(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE023",
+            defaultId: "SCRIBE025",
             defaultTitle: "Type must be private",
             defaultMessage: "Type '{0}' must be declared 'private'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -649,7 +649,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBePublic(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE024",
+            defaultId: "SCRIBE012",
             defaultTitle: "Type must not be public",
             defaultMessage: "Type '{0}' must not be declared 'public'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -665,7 +665,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBeInternal(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE025",
+            defaultId: "SCRIBE014",
             defaultTitle: "Type must not be internal",
             defaultMessage: "Type '{0}' must not be declared 'internal'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -701,7 +701,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBeRecord(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE027",
+            defaultId: "SCRIBE019",
             defaultTitle: "Type must be a record",
             defaultMessage: "Type '{0}' must be declared as a 'record'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -717,7 +717,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBeRecord(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE028",
+            defaultId: "SCRIBE020",
             defaultTitle: "Type must not be a record",
             defaultMessage: "Type '{0}' must not be declared as a 'record'",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -733,7 +733,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustBeValueType(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE029",
+            defaultId: "SCRIBE021",
             defaultTitle: "Type must be a value type",
             defaultMessage: "Type '{0}' must be a value type",
             defaultSeverity: DiagnosticSeverity.Error,
@@ -749,7 +749,7 @@ public sealed partial class ShapeBuilder
     public ShapeBuilder MustNotBeValueType(DiagnosticSpec? spec = null)
     {
         AddCheck(
-            defaultId: "SCRIBE030",
+            defaultId: "SCRIBE022",
             defaultTitle: "Type must not be a value type",
             defaultMessage: "Type '{0}' must not be a value type",
             defaultSeverity: DiagnosticSeverity.Error,
