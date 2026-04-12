@@ -11,7 +11,7 @@ internal sealed class AddParameterlessConstructorFix : IShapeFix
 {
     public string Title(Diagnostic _) => "Add public parameterless constructor";
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic _,
@@ -20,7 +20,7 @@ internal sealed class AddParameterlessConstructorFix : IShapeFix
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var name = typeDecl.Identifier.ValueText;
@@ -43,6 +43,6 @@ internal sealed class AddParameterlessConstructorFix : IShapeFix
         }
 
         var newTypeDecl = typeDecl.WithMembers(typeDecl.Members.Insert(insertAt, ctor));
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 }

@@ -15,7 +15,7 @@ internal sealed class AddBaseClassFix : IShapeFix
         return name is null ? "Add required base class" : $"Extend '{name}'";
     }
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic diagnostic,
@@ -24,13 +24,13 @@ internal sealed class AddBaseClassFix : IShapeFix
         var baseClassName = BaseClassName(diagnostic);
         if (baseClassName is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var baseType = SyntaxFactory.SimpleBaseType(SyntaxFactory.ParseTypeName(baseClassName));
@@ -49,7 +49,7 @@ internal sealed class AddBaseClassFix : IShapeFix
             newTypeDecl = typeDecl.WithBaseList(typeDecl.BaseList.WithTypes(withBase));
         }
 
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 
     private static string? BaseClassName(Diagnostic diagnostic)

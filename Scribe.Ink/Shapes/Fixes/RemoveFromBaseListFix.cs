@@ -15,7 +15,7 @@ internal sealed class RemoveFromBaseListFix : IShapeFix
         return name is null ? "Remove forbidden base type" : $"Remove '{name}'";
     }
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic diagnostic,
@@ -23,26 +23,26 @@ internal sealed class RemoveFromBaseListFix : IShapeFix
     {
         if (typeDecl.BaseList is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var target = TargetName(diagnostic);
         if (target is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var simpleName = ShortName(target);
         var match = typeDecl.BaseList.Types.FirstOrDefault(t => MatchesTypeName(t, target, simpleName));
         if (match is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var remaining = typeDecl.BaseList.Types.Remove(match);
@@ -50,7 +50,7 @@ internal sealed class RemoveFromBaseListFix : IShapeFix
             ? typeDecl.WithBaseList(null)
             : typeDecl.WithBaseList(typeDecl.BaseList.WithTypes(remaining));
 
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 
     private static string? TargetName(Diagnostic diagnostic)

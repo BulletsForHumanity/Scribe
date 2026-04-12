@@ -24,13 +24,17 @@ public sealed partial class ShapeBuilder
 {
     private readonly TypeKindFilter _kind;
     private readonly List<ShapeCheck> _checks = new();
+    private readonly List<MemberCheck> _memberChecks = new();
     private string? _primaryAttributeMetadataName;
+    private string? _primaryInterfaceMetadataName;
 
     internal ShapeBuilder(TypeKindFilter kind) => _kind = kind;
 
     internal TypeKindFilter Kind => _kind;
     internal IReadOnlyList<ShapeCheck> Checks => _checks;
+    internal IReadOnlyList<MemberCheck> MemberChecks => _memberChecks;
     internal string? PrimaryAttributeMetadataName => _primaryAttributeMetadataName;
+    internal string? PrimaryInterfaceMetadataName => _primaryInterfaceMetadataName;
 
     /// <summary>
     ///     Seal the builder and project matches into a cache-safe model.
@@ -50,9 +54,46 @@ public sealed partial class ShapeBuilder
         return new Shape<TModel>(
             kind: _kind,
             checks: _checks.ToArray(),
+            memberChecks: _memberChecks.ToArray(),
             primaryAttributeMetadataName: _primaryAttributeMetadataName,
+            primaryInterfaceMetadataName: _primaryInterfaceMetadataName,
             project: project);
     }
+
+    /// <summary>
+    ///     Narrow the shape to types implementing the interface named by
+    ///     <paramref name="metadataName"/>. Acts as a <em>filter</em>, not a check:
+    ///     types not implementing the interface are silently skipped — no diagnostic
+    ///     is produced. Contrast with <see cref="MustImplement(string, DiagnosticSpec?)"/>,
+    ///     which applies to every type of the configured kind and reports a violation
+    ///     on non-implementers.
+    /// </summary>
+    /// <remarks>
+    ///     Only one primary interface selector may be declared per shape. Subsequent
+    ///     calls are ignored. The selector routes collection through the ordinary
+    ///     <c>CreateSyntaxProvider</c> + semantic-model lookup path — no Roslyn
+    ///     fast-path equivalent to <c>ForAttributeWithMetadataName</c> exists for
+    ///     interface implementation.
+    /// </remarks>
+    public ShapeBuilder Implementing(string metadataName)
+    {
+        if (string.IsNullOrEmpty(metadataName))
+        {
+            throw new ArgumentException("Metadata name must not be empty.", nameof(metadataName));
+        }
+
+        _primaryInterfaceMetadataName ??= InternPool.Intern(metadataName);
+        return this;
+    }
+
+    /// <summary>
+    ///     Generic overload of <see cref="Implementing(string)"/>. Use when the
+    ///     interface's closed form is known at shape-declaration time; for open
+    ///     generics (e.g. <c>IFoo&lt;&gt;</c>), supply the metadata name directly.
+    /// </summary>
+    public ShapeBuilder Implementing<T>()
+        where T : class
+        => Implementing(typeof(T).FullName!);
 
     internal bool MatchesSyntaxNode(SyntaxNode node) =>
         _kind switch
@@ -745,6 +786,69 @@ public sealed partial class ShapeBuilder
         return this;
     }
 
+    /// <summary>
+    ///     Require the type to be a <c>record struct</c>. Fires a single diagnostic
+    ///     when the declaration is any other kind (class, record class, plain struct).
+    ///     No auto-fix — rewriting to a record struct changes the type's identity and
+    ///     semantics enough that the repair is left to the user.
+    /// </summary>
+    public ShapeBuilder MustBeRecordStruct(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE032",
+            defaultTitle: "Type must be a record struct",
+            defaultMessage: "Type '{0}' must be declared as 'record struct'",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.TypeKeyword,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.IsRecord && sym.IsValueType,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>
+    ///     Require the type to be declared <c>readonly</c>. Vacuously satisfied for
+    ///     reference types — the <c>readonly</c> modifier is a value-type concept, so
+    ///     non-value-types pass this check. Pair with <see cref="MustBeValueType"/>
+    ///     or a kind filter if you want a non-struct to also be rejected.
+    /// </summary>
+    public ShapeBuilder MustBeReadOnly(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE033",
+            defaultTitle: "Type must be readonly",
+            defaultMessage: "Type '{0}' must be declared 'readonly'",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            defaultSquiggle: SquiggleAt.Identifier,
+            defaultFix: FixKind.AddReadOnlyModifier,
+            predicate: static (sym, _, _) => !sym.IsValueType || sym.IsReadOnly,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
+    /// <summary>
+    ///     Forbid the type from being nested inside another type. No auto-fix —
+    ///     moving a declaration out of its containing type has too many user-level
+    ///     consequences (accessibility, references, file layout) for Scribe to
+    ///     automate.
+    /// </summary>
+    public ShapeBuilder MustNotBeNested(DiagnosticSpec? spec = null)
+    {
+        AddCheck(
+            defaultId: "SCRIBE034",
+            defaultTitle: "Type must not be nested",
+            defaultMessage: "Type '{0}' must be declared at the top level, not nested inside another type",
+            defaultSeverity: DiagnosticSeverity.Error,
+            defaultSquiggle: SquiggleAt.Identifier,
+            defaultFix: FixKind.None,
+            predicate: static (sym, _, _) => sym.ContainingType is null,
+            messageArgs: static sym => EquatableArray.Create(sym.Name),
+            spec: spec);
+        return this;
+    }
+
     /// <summary>Forbid the type from being a value type.</summary>
     public ShapeBuilder MustNotBeValueType(DiagnosticSpec? spec = null)
     {
@@ -904,5 +1008,129 @@ public sealed partial class ShapeBuilder
         }
 
         return false;
+    }
+
+    // ───────────────────────────────────────────────────────────────
+    //  Escape hatches — custom type-level check, member-level iteration
+    // ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Register a custom type-level check whose predicate the primitive catalog
+    ///     does not cover. Returns <see langword="true"/> when the shape is
+    ///     satisfied; <see langword="false"/> reports one diagnostic per matched type.
+    /// </summary>
+    /// <param name="predicate">
+    ///     Positive predicate — <see langword="true"/> means the shape is satisfied.
+    /// </param>
+    /// <param name="id">Diagnostic ID (e.g. <c>WORD9000</c>).</param>
+    /// <param name="title">One-line diagnostic title.</param>
+    /// <param name="message">Message format — first arg <c>{0}</c> is the type name.</param>
+    /// <param name="severity">Severity (defaults to <see cref="DiagnosticSeverity.Warning"/>).</param>
+    /// <param name="squiggle">Anchor where the diagnostic lands.</param>
+    /// <param name="fix">Auto-fix kind. <see cref="FixKind.Custom"/> pairs with <paramref name="customFixTag"/>.</param>
+    /// <param name="customFixTag">Tag for lookup when <paramref name="fix"/> is <see cref="FixKind.Custom"/>.</param>
+    /// <param name="messageArgs">
+    ///     Additional message arguments beyond the type name (<c>{1}</c>, <c>{2}</c>, ...).
+    ///     Optional — default yields just the type name as <c>{0}</c>.
+    /// </param>
+    public ShapeBuilder Check(
+        Func<INamedTypeSymbol, Compilation, CancellationToken, bool> predicate,
+        string id,
+        string title,
+        string message,
+        DiagnosticSeverity severity = DiagnosticSeverity.Warning,
+        SquiggleAt squiggle = SquiggleAt.Identifier,
+        FixKind fix = FixKind.None,
+        string? customFixTag = null,
+        Func<INamedTypeSymbol, EquatableArray<string>>? messageArgs = null)
+    {
+        if (predicate is null)
+        {
+            throw new ArgumentNullException(nameof(predicate));
+        }
+
+        if (string.IsNullOrEmpty(id))
+        {
+            throw new ArgumentException("Diagnostic id must not be empty.", nameof(id));
+        }
+
+        var args = messageArgs ?? (static sym => EquatableArray.Create(sym.Name));
+
+        ImmutableDictionary<string, string?>? fixProps = null;
+        if (fix == FixKind.Custom && !string.IsNullOrEmpty(customFixTag))
+        {
+            fixProps = ImmutableDictionary<string, string?>.Empty.Add("customFixTag", customFixTag);
+        }
+
+        _checks.Add(new ShapeCheck(
+            Id: InternPool.Intern(id),
+            Title: title,
+            MessageFormat: message,
+            Severity: severity,
+            SquiggleAt: squiggle,
+            FixKind: fix,
+            Predicate: predicate,
+            MessageArgs: args,
+            FixProperties: fixProps is null ? null : _ => fixProps));
+        return this;
+    }
+
+    /// <summary>
+    ///     Iterate declared members of each matched type. For each member satisfying
+    ///     <paramref name="match"/>, emit one diagnostic (anchored per
+    ///     <see cref="MemberDiagnosticSpec.Squiggle"/> on that member) with the
+    ///     message arguments returned by <paramref name="messageArgs"/>.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <paramref name="match"/> is an <em>offender</em> predicate —
+    ///         <see langword="true"/> means "this member violates the shape". Contrast
+    ///         with type-level checks where the predicate is positive.
+    ///     </para>
+    ///     <para>
+    ///         Implicitly-declared members (synthesized record constructor parameters,
+    ///         value-equality backing, etc.) are filtered before <paramref name="match"/>
+    ///         runs. Members without source syntax references are also skipped.
+    ///     </para>
+    /// </remarks>
+    /// <param name="match">Offender predicate — <see langword="true"/> reports a diagnostic.</param>
+    /// <param name="spec">Diagnostic descriptor.</param>
+    /// <param name="messageArgs">Message argument builder. <c>{0}</c> defaults to the type name; the user supplies any remaining args (typically the member name).</param>
+    public ShapeBuilder ForEachMember(
+        Func<ISymbol, bool> match,
+        MemberDiagnosticSpec spec,
+        Func<INamedTypeSymbol, ISymbol, EquatableArray<string>>? messageArgs = null)
+    {
+        if (match is null)
+        {
+            throw new ArgumentNullException(nameof(match));
+        }
+
+        if (string.IsNullOrEmpty(spec.Id))
+        {
+            throw new ArgumentException("MemberDiagnosticSpec.Id must not be empty.", nameof(spec));
+        }
+
+        var args = messageArgs ?? (static (type, member) => EquatableArray.Create(type.Name, member.Name));
+
+        Func<INamedTypeSymbol, ISymbol, ImmutableDictionary<string, string?>>? fixProps = null;
+        if (spec.Fix == FixKind.Custom && !string.IsNullOrEmpty(spec.CustomFixTag))
+        {
+            var tag = spec.CustomFixTag!;
+            fixProps = (_, _) => ImmutableDictionary<string, string?>.Empty.Add("customFixTag", tag);
+        }
+
+        _memberChecks.Add(new MemberCheck(
+            Id: InternPool.Intern(spec.Id),
+            Title: spec.Title,
+            MessageFormat: spec.Message,
+            Severity: spec.Severity,
+            SquiggleAt: spec.Squiggle,
+            FixKind: spec.Fix,
+            CustomFixTag: spec.CustomFixTag,
+            Match: match,
+            MessageArgs: args,
+            FixProperties: fixProps));
+        return this;
     }
 }

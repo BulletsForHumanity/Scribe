@@ -27,6 +27,7 @@ internal static class FixResolver
         FixKind.RemoveAttribute => new RemoveAttributeFix(),
         FixKind.SetVisibility => new SetVisibilityFix(),
         FixKind.AddParameterlessConstructor => new AddParameterlessConstructorFix(),
+        FixKind.AddReadOnlyModifier => new AddReadOnlyModifierFix(),
         _ => null,
     };
 }

@@ -10,7 +10,7 @@ internal sealed class AddSealedModifierFix : IShapeFix
 {
     public string Title(Diagnostic _) => "Add 'sealed' modifier";
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic _,
@@ -18,13 +18,13 @@ internal sealed class AddSealedModifierFix : IShapeFix
     {
         if (typeDecl.Modifiers.Any(SyntaxKind.SealedKeyword))
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var sealedToken = SyntaxFactory.Token(SyntaxKind.SealedKeyword)
@@ -44,6 +44,6 @@ internal sealed class AddSealedModifierFix : IShapeFix
         }
 
         var newTypeDecl = typeDecl.WithModifiers(modifiers.Insert(insertAt, sealedToken));
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 }

@@ -10,7 +10,7 @@ internal sealed class AddAbstractModifierFix : IShapeFix
 {
     public string Title(Diagnostic _) => "Add 'abstract' modifier";
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic _,
@@ -18,13 +18,13 @@ internal sealed class AddAbstractModifierFix : IShapeFix
     {
         if (typeDecl.Modifiers.Any(SyntaxKind.AbstractKeyword))
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var abstractToken = SyntaxFactory.Token(SyntaxKind.AbstractKeyword)
@@ -42,6 +42,6 @@ internal sealed class AddAbstractModifierFix : IShapeFix
         }
 
         var newTypeDecl = typeDecl.WithModifiers(modifiers.Insert(insertAt, abstractToken));
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 }

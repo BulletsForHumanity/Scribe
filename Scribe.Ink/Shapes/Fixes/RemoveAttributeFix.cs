@@ -16,7 +16,7 @@ internal sealed class RemoveAttributeFix : IShapeFix
         return name is null ? "Remove forbidden attribute" : $"Remove '[{Shorten(name)}]'";
     }
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic diagnostic,
@@ -25,7 +25,7 @@ internal sealed class RemoveAttributeFix : IShapeFix
         var target = AttributeName(diagnostic);
         if (target is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var shortName = Shorten(target);
@@ -34,7 +34,7 @@ internal sealed class RemoveAttributeFix : IShapeFix
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var newTypeDecl = typeDecl;
@@ -63,7 +63,7 @@ internal sealed class RemoveAttributeFix : IShapeFix
             }
         }
 
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 
     private static bool Matches(AttributeSyntax attribute, string full, string shortName)

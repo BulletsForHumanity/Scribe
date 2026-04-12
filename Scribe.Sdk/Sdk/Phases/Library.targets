@@ -58,29 +58,21 @@
          The host is already built at this point; the inner Build just needs
          to resolve the already-produced artifact. Without this flag, a
          Companion that ProjectReferences its Library creates MSBuild cycle
-         MSB4006 during pack. -->
-    <MSBuild Projects="@(ScribeCompanion)"
-             Targets="Build"
-             Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false;BuildProjectReferences=false" />
+         MSB4006 during pack. GetAnalyzerFiles itself DependsOnTargets="Build"
+         (see Companion.targets) so Build is invoked as part of the same
+         nested MSBuild call — this keeps @(ReferenceCopyLocalPaths) populated
+         in the evaluated instance when Returns is captured. -->
     <MSBuild Projects="@(ScribeCompanion)"
              Targets="GetAnalyzerFiles"
              Properties="TargetFramework=netstandard2.0;Configuration=$(Configuration);NoBuild=false;BuildProjectReferences=false">
       <Output TaskParameter="TargetOutputs" ItemName="_ScribeCompanionAnalyzerFileRaw" />
     </MSBuild>
-    <!-- Deduplicate by filename. Multiple companions commonly pull in the same
-         shared runtime deps (e.g. the host Library's own DLL). Without this,
-         the nupkg ends up with duplicate analyzer files at the same path. -->
-    <RemoveDuplicates Inputs="@(_ScribeCompanionAnalyzerFileRaw->'%(Filename)%(Extension)')">
-      <Output TaskParameter="Filtered" ItemName="_ScribeCompanionAnalyzerName" />
-    </RemoveDuplicates>
+    <!-- Deduplicate by full path. Multiple companions commonly pull in the same
+         shared runtime deps (e.g. the host Library's own DLL). Distinct()
+         collapses identical identities; pairs with different absolute paths
+         are left intact (NuGet will flag true collisions via NU5118). -->
     <ItemGroup>
-      <_ScribeCompanionAnalyzerFile
-        Include="@(_ScribeCompanionAnalyzerFileRaw)"
-        Condition="'@(_ScribeCompanionAnalyzerName)' != ''
-                   and $([System.String]::new('%3B@(_ScribeCompanionAnalyzerName)%3B').Contains('%3B%(_ScribeCompanionAnalyzerFileRaw.Filename)%(_ScribeCompanionAnalyzerFileRaw.Extension)%3B'))" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Include="@(_ScribeCompanionAnalyzerFile)"
+      <None Include="@(_ScribeCompanionAnalyzerFileRaw->Distinct())"
             Pack="true"
             PackagePath="analyzers/dotnet/cs"
             Visible="false" />

@@ -1,18 +1,24 @@
 {
   "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
-  "version": "0.5",
+  "version": "0.6",
   "nugetPackageVersion": {
     "semVer": 2
   },
   "publicReleaseRefSpec": ["^refs/heads/master$"],
   "gitCommitIdShortAutoMinimum": 7,
   "release": {
-    "branchName": "release/scribe/v{version}",
+    "branchName": "release/sdk/v{version}",
     "versionIncrement": "minor",
     "firstUnstableTag": "preview"
   },
   "pathFilters": [
     ".",
-    ":!./Scribe.Sdk"
+    "../Directory.Build.props",
+    "../Directory.Build.targets",
+    "../Directory.Packages.props",
+    "../global.json",
+    "../Scribe/build/Scribe.LocalDev.props",
+    "../Scribe/build/Scribe.LocalDev.targets",
+    "../LICENSE"
   ]
 }

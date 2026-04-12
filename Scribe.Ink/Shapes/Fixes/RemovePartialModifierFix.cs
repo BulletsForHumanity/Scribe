@@ -11,7 +11,7 @@ internal sealed class RemovePartialModifierFix : IShapeFix
 {
     public string Title(Diagnostic _) => "Remove 'partial' modifier";
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic _,
@@ -20,16 +20,16 @@ internal sealed class RemovePartialModifierFix : IShapeFix
         var token = typeDecl.Modifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.PartialKeyword));
         if (token == default)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var newTypeDecl = typeDecl.WithModifiers(typeDecl.Modifiers.Remove(token));
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 }

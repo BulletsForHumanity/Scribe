@@ -14,7 +14,7 @@ internal sealed class AddInterfaceToBaseListFix : IShapeFix
         return name is null ? "Add required interface" : $"Implement '{name}'";
     }
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic diagnostic,
@@ -23,13 +23,13 @@ internal sealed class AddInterfaceToBaseListFix : IShapeFix
         var interfaceName = InterfaceName(diagnostic);
         if (interfaceName is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var baseType = SyntaxFactory.SimpleBaseType(SyntaxFactory.ParseTypeName(interfaceName));
@@ -39,7 +39,7 @@ internal sealed class AddInterfaceToBaseListFix : IShapeFix
                 SyntaxFactory.SingletonSeparatedList<BaseTypeSyntax>(baseType)))
             : typeDecl.WithBaseList(typeDecl.BaseList.AddTypes(baseType));
 
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 
     private static string? InterfaceName(Diagnostic diagnostic)

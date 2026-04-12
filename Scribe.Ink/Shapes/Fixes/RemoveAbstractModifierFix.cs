@@ -11,7 +11,7 @@ internal sealed class RemoveAbstractModifierFix : IShapeFix
 {
     public string Title(Diagnostic _) => "Remove 'abstract' modifier";
 
-    public async Task<Document> FixAsync(
+    public async Task<Solution> FixAsync(
         Document document,
         TypeDeclarationSyntax typeDecl,
         Diagnostic _,
@@ -20,16 +20,16 @@ internal sealed class RemoveAbstractModifierFix : IShapeFix
         var abstractToken = typeDecl.Modifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.AbstractKeyword));
         if (abstractToken == default)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
         if (root is null)
         {
-            return document;
+            return document.Project.Solution;
         }
 
         var newTypeDecl = typeDecl.WithModifiers(typeDecl.Modifiers.Remove(abstractToken));
-        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl));
+        return document.WithSyntaxRoot(root.ReplaceNode(typeDecl, newTypeDecl)).Project.Solution;
     }
 }
