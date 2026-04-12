@@ -15,7 +15,7 @@
     Name="_ScribeLocalDevTimestampVersion"
     AfterTargets="GetBuildVersion"
     BeforeTargets="Build;Pack;GenerateNuspec"
-    Condition="'$(IsLocalScribe)' == 'true' and '$(IsPackable)' != 'false'"
+    Condition="'$(IsLocalProducer)' == 'true' and '$(IsPackable)' != 'false'"
   >
     <PropertyGroup>
       <_DevTimestamp>$([System.DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff"))</_DevTimestamp>

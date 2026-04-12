@@ -1,0 +1,24 @@
+<Project>
+  <!--
+      Scribe.Sdk — Phase 03: Classification
+
+      Reads $(ScribeSdkProjectType) and sets boolean flags for downstream phases.
+      Runs early in the .targets phase, after the consumer .csproj has declared
+      its type.
+
+      $(ScribeSdkProjectType) must be one of:
+        • Library    — main shippable library (may embed companions).
+        • Companion  — analyzer/generator/fixer that ships inside its host Library.
+        • Analyzer   — standalone analyzer/generator NuGet package.
+        • Meta       — build-time-only generator, solution-local, never shipped.
+
+      Validation.targets enforces that one of these is set.
+  -->
+
+  <PropertyGroup>
+    <_IsScribeLibrary Condition="'$(ScribeSdkProjectType)' == 'Library'">true</_IsScribeLibrary>
+    <_IsScribeCompanion Condition="'$(ScribeSdkProjectType)' == 'Companion'">true</_IsScribeCompanion>
+    <_IsScribeAnalyzer Condition="'$(ScribeSdkProjectType)' == 'Analyzer'">true</_IsScribeAnalyzer>
+    <_IsScribeMeta Condition="'$(ScribeSdkProjectType)' == 'Meta'">true</_IsScribeMeta>
+  </PropertyGroup>
+</Project>

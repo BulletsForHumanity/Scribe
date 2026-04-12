@@ -1,0 +1,29 @@
+<!--
+    TODO(dogfood): switch to <Project Sdk="BulletsForHumanity.Scribe.Sdk"> with
+    ScribeSdkProjectType=Meta once the Sdk's project-types support lands
+    (see SCRIBE_SDK_PROJECT_TYPES_REQS.md).
+
+    Scriptorium is a build-time-only source generator that runs during Scribe's
+    own compile to emit Should*/Could*/ShouldNot* variants of each Must* primitive
+    on ShapeBuilder. Never shipped to consumers.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsPackable>false</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <DebugType>embedded</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Scribe.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

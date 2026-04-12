@@ -12,17 +12,20 @@
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
-    <!-- CA1707: test method names use underscores by convention. -->
-    <NoWarn>$(NoWarn);CA1707</NoWarn>
+    <!-- CA1707: test method names use underscores by convention.
+         RS2008: release tracking applies to analyzer projects, not test projects that
+                 happen to construct DiagnosticDescriptor instances for assertions. -->
+    <NoWarn>$(NoWarn);CA1707;RS2008</NoWarn>
   </PropertyGroup>
 
   <!-- ── Scribe LocalDev ─────────────────────────────────────────────── -->
   <!-- Scribe can't get these from a NuGet package (it IS the package),
-       so we set them here and import the props file directly. -->
+       so we set them here and import the props file directly.
+       $(ScribesName) drives sentinel detection (.scribe.user or .scribe.local),
+       auto-pack, and override-file naming. -->
   <PropertyGroup>
     <ScribeRoot>$(MSBuildThisFileDirectory)..</ScribeRoot>
-    <ScribeLocalDevTriggerProject>Scribe</ScribeLocalDevTriggerProject>
-    <ScribeLocalDevPackageNames>BulletsForHumanity.Scribe</ScribeLocalDevPackageNames>
+    <ScribesName>Scribe</ScribesName>
   </PropertyGroup>
   <Import Project="$(MSBuildThisFileDirectory)Scribe\build\Scribe.LocalDev.props"
           Condition="Exists('$(MSBuildThisFileDirectory)Scribe\build\Scribe.LocalDev.props')" />
@@ -63,9 +66,9 @@
        ============================================================ -->
   <PropertyGroup>
     <!-- CI uses explicit `dotnet pack` in the pipeline. No auto-pack needed.
-         In Local Scribe mode, Scribe.LocalDev.props already redirects the trigger project
-         to the shared artifacts directory — don't overwrite that. -->
-    <PackageOutputPath Condition="'$(IsLocalScribe)' != 'true'">$(ArtifactsPath)packages/</PackageOutputPath>
+         When this producer is in local mode, Scribe.LocalDev.props redirects the
+         trigger project to the shared artifacts directory — don't overwrite that. -->
+    <PackageOutputPath Condition="'$(IsLocalProducer)' != 'true'">$(ArtifactsPath)packages/</PackageOutputPath>
     <Authors>Max Obrist</Authors>
     <Company>Bullets for Humanity</Company>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>

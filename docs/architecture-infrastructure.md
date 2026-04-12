@@ -113,7 +113,7 @@ Solution-Local Analyzer and LocalDev use the same underlying mechanism but at di
 | Concern | LocalDev | Solution-Local Analyzer |
 | --------- | ---------- | ------------------------ |
 | Scope | Cross-repo | Intra-solution |
-| Trigger | `.localscribe` sentinel | `ScribeSolutionAnalyzer=true` |
+| Trigger | `.<producer>.user` or `.<producer>.local` sentinel (e.g. `.scribe.user`, `.hermetic.local`) | `ScribeSolutionAnalyzer=true` |
 | Version | NBGV + timestamp suffix | Timestamp-only (`0.0.0-dev.yyyyMMddHHmmss`) |
 | Override files | Generated `.Directory.Packages.targets` | Same — generated `.Directory.Packages.targets` |
 | Package directory | Shared `$(ScribeRoot)/.artifacts/packages/` | Solution `$(ArtifactsPath)packages/` |
@@ -169,22 +169,48 @@ All subsequent property groups and imports are conditioned on `'$(_ScribeLocalDe
 
 ### Sentinel File Detection
 
-Activates Local Scribe mode when a `.localscribe` file exists in `$(ScribeRoot)` (the shared workspace root). This works in both Visual Studio and CLI builds without build configuration hacks.
+Two tiers of activation — one per-producer, one umbrella:
+
+**Per-producer (`$(IsLocalProducer)`):** each producer declares `$(ScribesName)` in its Directory.Build.props (e.g. `Scribe`, `Hermetic`). EITHER `.$(ScribesName).user` OR `.$(ScribesName).local` (lowercased, e.g. `.hermetic.user` / `.hermetic.local`) at `$(ScribeRoot)` flips `$(IsLocalProducer)` on for that project. Producer mode gates auto-pack, timestamped versions, and override-file emission.
 
 ```xml
-<PropertyGroup Condition="'$(_ScribeLocalDevSkip)' != 'true'
-                          and '$(IsLocalScribe)' != 'true'
-                          and '$(ScribeRoot)' != ''
-                          and Exists('$(ScribeRoot)\.localscribe')">
+<PropertyGroup Condition="'$(ScribesName)' != '' and '$(ScribeRoot)' != ''">
+  <_ScribeProducerBase>$(ScribeRoot)\.$(ScribesName.ToLowerInvariant())</_ScribeProducerBase>
+</PropertyGroup>
+<PropertyGroup Condition="'$(IsLocalProducer)' != 'true'
+                          and '$(_ScribeProducerBase)' != ''
+                          and (Exists('$(_ScribeProducerBase).user') or Exists('$(_ScribeProducerBase).local'))">
+  <IsLocalProducer>true</IsLocalProducer>
+</PropertyGroup>
+```
+
+**Umbrella (`$(IsLocalScribe)`):** ANY `.*.user` or `.*.local` sentinel at `$(ScribeRoot)` flips `$(IsLocalScribe)` on. The umbrella flag governs consumer-side infrastructure: NuGet source registration and override-file imports.
+
+```xml
+<ItemGroup>
+  <_ScribeLocalSentinel Include="$(ScribeRoot)\.*.user" />
+  <_ScribeLocalSentinel Include="$(ScribeRoot)\.*.local" />
+</ItemGroup>
+<!-- MSBuild forbids @(ItemList) references in Condition attributes (MSB4099),
+     so project the ItemGroup into a property first, then condition on it. -->
+<PropertyGroup>
+  <_ScribeLocalSentinelList>@(_ScribeLocalSentinel)</_ScribeLocalSentinelList>
+</PropertyGroup>
+<PropertyGroup Condition="'$(_ScribeLocalSentinelList)' != ''">
   <IsLocalScribe>true</IsLocalScribe>
 </PropertyGroup>
 ```
 
-Three activation methods:
+Three activation methods (umbrella):
 
-1. **Sentinel file (recommended):** Create `.localscribe` in `$(ScribeRoot)`. Delete it to deactivate. Add `.localscribe` to `.gitignore`.
-2. **Explicit property:** `-p:IsLocalScribe=true` on the command line.
+1. **Sentinel file (recommended):** Create `.<producer>.user` OR `.<producer>.local` in `$(ScribeRoot)` — e.g. `.scribe.user` to build Scribe locally, `.hermetic.local` to build Hermetic locally. Either form works. Delete to deactivate. Add to `.gitignore`.
+
+    **Why two forms?** `.user` is the .NET convention — `*.user` is in the standard [VisualStudio.gitignore](https://github.com/github/gitignore/blob/main/VisualStudio.gitignore), so it won't be accidentally committed. `.local` reads more naturally and matches the JS ecosystem (Vite, Next.js). Both are accepted rather than forcing a choice between idioms.
+
+2. **Explicit property:** `-p:IsLocalScribe=true` on the command line — consumer infra only. Does not activate any specific producer; pair with a `-p:IsLocalProducer=true` or a sentinel.
 3. **Props file:** `<IsLocalScribe>true</IsLocalScribe>` in Directory.Build.props or Directory.Solution.props.
+
+**Typo tolerance:** `$(ScribeName)` (non-possessive) forwards to `$(ScribesName)` if only the former is set.
 
 ### Path Setup
 
@@ -200,7 +226,7 @@ When active, derives the shared artifacts and packages directories from `$(Scrib
 
 ### Auto-Pack
 
-For the trigger project only, enables `GeneratePackageOnBuild` and redirects output to the shared packages directory:
+For the trigger project only — identified by `$(MSBuildProjectName) == $(ScribesName)` — and only when `$(IsLocalProducer) == true`, enables `GeneratePackageOnBuild` and redirects output to the shared packages directory:
 
 ```xml
 <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -229,7 +255,14 @@ Uses a wildcard import to pick up all override files from the shared artifacts d
 
 ### Override File Generation
 
-The `_ScribeLocalDevOverride` target runs after `Pack` on the trigger project only. It generates a `.Directory.Packages.targets` file containing `PackageVersion Update` entries:
+The `_ScribeLocalDevOverride` target runs after `Pack` on the trigger project only, gated on `$(IsLocalProducer) == true`. The file is named after `$(ScribesName)` so a consumer can load it by string-concat:
+
+```csharp
+$(ScribeArtifactsDir)$(ScribesName).Directory.Packages.targets
+// e.g. .artifacts/Hermetic.Directory.Packages.targets
+```
+
+Contents:
 
 ```xml
 <Project>
@@ -241,6 +274,15 @@ The `_ScribeLocalDevOverride` target runs after `Pack` on the trigger project on
 ```
 
 The version is read from `$(NuGetPackageVersion)` (set by Nerdbank.GitVersioning or the SDK).
+
+### Cleanup on Sentinel Removal
+
+The `_ScribeLocalDevCleanupStale` target runs `BeforeTargets="Build"` on the trigger project when `$(IsLocalProducer) != true` and `$(ScribesName) != ''`. It deletes:
+
+- The stale `$(ScribesName).Directory.Packages.targets` override file (if present).
+- Stale `-dev.*` packages matching each ID in `$(ScribeLocalDevPackageNames)` (`.nupkg` and `.snupkg`).
+
+Cleanup is scoped to this producer's own artifacts only — other producers' files are untouched. Removing a producer's `.<producer>.user` / `.<producer>.local` sentinel and rebuilding the producer normally is enough to clean its dev packages out of the shared artifacts folder.
 
 ---
 
