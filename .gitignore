@@ -1,7 +1,5 @@
-# Scribe LocalDev sentinels — per-producer (.scribe.user, .hermetic.local, ...)
-# Either suffix activates producer mode; both are supported (see Scribe docs).
-*.user
-*.local
+# Scribe LocalDev sentinels — per-producer (.scribe.scribe, .hermetic.scribe, ...)
+*.scribe
 
 # Build output
 bin/

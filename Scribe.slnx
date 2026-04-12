@@ -1,5 +1,8 @@
 <Solution>
   <Project Path="Scribe/Scribe.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path="version.json" />
+  </Folder>
   <Project Path="Scribe.Ink/Scribe.Ink.csproj" />
   <Project Path="Scribe.Scriptorium/Scribe.Scriptorium.csproj" />
   <Project Path="Scribe.Sdk/Scribe.Sdk.csproj" />

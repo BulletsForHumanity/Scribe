@@ -4,9 +4,8 @@
 
       Per-project local NuGet development: each producer declares its own name
       via $(ScribesName), and activates "producer mode" when a sentinel file
-      '.$(ScribesName).user' or '.$(ScribesName).local' exists in $(ScribeRoot).
-      Consumer-side infrastructure activates whenever *any* such suffix sentinel
-      is present.
+      '.$(ScribesName).scribe' exists in $(ScribeRoot). Consumer-side
+      infrastructure activates whenever *any* such sentinel is present.
 
       ── Setup ──────────────────────────────────────────────────────────────
 
@@ -23,18 +22,14 @@
       ── Activation ─────────────────────────────────────────────────────────
 
       Producer mode (auto-pack, timestamped versions, override-file generation):
-        Create EITHER '.$(ScribesName).user' OR '.$(ScribesName).local' in
-        $(ScribeRoot), e.g. '.hermetic.user' or '.hermetic.local'. Both forms
-        are supported: '.user' follows the .NET convention (matches
-        VisualStudio.gitignore's '*.user' rule out of the box); '.local' reads
-        more naturally and matches the JS ecosystem (Vite, Next.js). Pick
-        whichever you prefer — either activates. Lowercase is canonical;
-        Windows matches case-insensitively, Linux does not.
+        Create '.$(ScribesName).scribe' in $(ScribeRoot), e.g. '.hermetic.scribe'
+        or '.scribe.scribe'. Lowercase is canonical (Windows matches case-
+        insensitively, Linux does not). The '.scribe' suffix is brand-unique
+        and gitignored via a single '*.scribe' rule.
 
       Consumer mode (local package source, import overrides from artifacts):
-        Activates when ANY '.*.user' or '.*.local' sentinel exists in
-        $(ScribeRoot), or when $(IsLocalScribe) is set true via CLI /
-        Directory.Build.props.
+        Activates when ANY '.*.scribe' sentinel exists in $(ScribeRoot), or
+        when $(IsLocalScribe) is set true via CLI / Directory.Build.props.
 
       ── Producer Set ────────────────────────────────────────────────────
 
@@ -48,10 +43,10 @@
 
         $(IsLocalScribe)       'true' when any local sentinel is active
                                (umbrella flag — governs consumer-side infra).
-        $(IsLocalProducer)     'true' when THIS project's '.$(ScribesName).user'
-                               or '.$(ScribesName).local' sentinel exists
-                               (applies to every project in the set — governs
-                               auto-pack and override-file emission).
+        $(IsLocalProducer)     'true' when THIS project's '.$(ScribesName).scribe'
+                               sentinel exists (applies to every project in
+                               the set — governs auto-pack and override-file
+                               emission).
         $(ScribeArtifactsDir)  $(ScribeRoot)\.artifacts\
         $(ScribePackagesDir)   $(ScribeArtifactsDir)packages\
 
@@ -84,17 +79,26 @@
     <ScribesName>$(ScribeName)</ScribesName>
   </PropertyGroup>
 
-  <!-- ── Umbrella Sentinel Scan (any .*.user / .*.local) ────────────────── -->
-  <!-- Any '.*.user' or '.*.local' file at $(ScribeRoot) flips $(IsLocalScribe) on.
-       This governs consumer-side infrastructure: NuGet source registration
+  <!-- ── Umbrella Sentinel Scan (.*.scribe) ──────────────────────────────── -->
+  <!-- Any '.<producer>.scribe' file at $(ScribeRoot) flips $(IsLocalScribe)
+       on. Governs consumer-side infrastructure: NuGet source registration
        and version-override imports.
+
+       Examples: '.hermetic.scribe', '.scribe.scribe'.
+
+       The '.scribe' suffix is brand-unique — zero risk of collision with
+       .NET's '.user' (VS project user settings) or the JS ecosystem's
+       '.local' (Vite/Next.js/prettier env files). Gitignore with a single
+       line: '*.scribe'.
+
+       Forward slashes keep MSBuild's glob engine behaving identically on Linux
+       and Windows.
 
        NOTE: MSBuild forbids @(ItemList) references inside Condition attributes
        (MSB4099). Project the ItemGroup into a property first, then condition
        on the property. -->
   <ItemGroup Condition="'$(_ScribeLocalDevSkip)' != 'true' and '$(ScribeRoot)' != ''">
-    <_ScribeLocalSentinel Include="$(ScribeRoot)\.*.user" />
-    <_ScribeLocalSentinel Include="$(ScribeRoot)\.*.local" />
+    <_ScribeLocalSentinel Include="$(ScribeRoot)/.*.scribe" />
   </ItemGroup>
   <PropertyGroup Condition="'$(_ScribeLocalDevSkip)' != 'true'">
     <_ScribeLocalSentinelList>@(_ScribeLocalSentinel)</_ScribeLocalSentinelList>
@@ -107,15 +111,14 @@
 
   <!-- ── Per-Project Producer Sentinel ─────────────────────────────────── -->
   <!-- Activates producer mode for the project that declares $(ScribesName).
-       Matches EITHER '.$(ScribesName).user' OR '.$(ScribesName).local'
-       (lowercased). Both forms are supported — pick whichever you prefer. -->
+       Matches '.$(ScribesName).scribe' (lowercased) in $(ScribeRoot). -->
   <PropertyGroup Condition="'$(_ScribeLocalDevSkip)' != 'true' and '$(ScribesName)' != '' and '$(ScribeRoot)' != ''">
-    <_ScribeProducerBase>$(ScribeRoot)\.$(ScribesName.ToLowerInvariant())</_ScribeProducerBase>
+    <_ScribeProducerSentinel>$(ScribeRoot)\.$(ScribesName.ToLowerInvariant()).scribe</_ScribeProducerSentinel>
   </PropertyGroup>
   <PropertyGroup Condition="'$(_ScribeLocalDevSkip)' != 'true'
                             and '$(IsLocalProducer)' != 'true'
-                            and '$(_ScribeProducerBase)' != ''
-                            and (Exists('$(_ScribeProducerBase).user') or Exists('$(_ScribeProducerBase).local'))">
+                            and '$(_ScribeProducerSentinel)' != ''
+                            and Exists('$(_ScribeProducerSentinel)')">
     <IsLocalProducer>true</IsLocalProducer>
   </PropertyGroup>
 
@@ -123,7 +126,18 @@
   <PropertyGroup Condition="'$(_ScribeLocalDevSkip)' != 'true' and '$(IsLocalScribe)' == 'true' and '$(ScribeRoot)' != ''">
     <ScribeArtifactsDir>$(ScribeRoot)\.artifacts\</ScribeArtifactsDir>
     <ScribePackagesDir>$(ScribeArtifactsDir)packages\</ScribePackagesDir>
-    <!-- Register the local packages directory as a NuGet source so restore finds them. -->
+  </PropertyGroup>
+
+  <!-- Register the local packages directory as a NuGet source so restore finds
+       them. Only do this if the directory actually exists — NuGet emits NU1301
+       otherwise ("The local source ... doesn't exist"), which breaks restore on
+       fresh clones / CI where nothing has been packed yet. The auto-pack block
+       below is what creates the directory; once it exists, subsequent restores
+       pick it up. -->
+  <PropertyGroup Condition="'$(_ScribeLocalDevSkip)' != 'true'
+                            and '$(IsLocalScribe)' == 'true'
+                            and '$(ScribePackagesDir)' != ''
+                            and Exists('$(ScribePackagesDir)')">
     <RestoreAdditionalProjectSources>
       $(RestoreAdditionalProjectSources);$(ScribePackagesDir)
     </RestoreAdditionalProjectSources>

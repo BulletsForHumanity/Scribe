@@ -21,7 +21,7 @@
   <!-- ── Scribe LocalDev ─────────────────────────────────────────────── -->
   <!-- Scribe can't get these from a NuGet package (it IS the package),
        so we set them here and import the props file directly.
-       $(ScribesName) drives sentinel detection (.scribe.user or .scribe.local),
+       $(ScribesName) drives sentinel detection (.scribe.scribe),
        auto-pack, and override-file naming. -->
   <PropertyGroup>
     <ScribeRoot>$(MSBuildThisFileDirectory)..</ScribeRoot>

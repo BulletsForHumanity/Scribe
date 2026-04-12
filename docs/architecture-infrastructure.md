@@ -113,7 +113,7 @@ Solution-Local Analyzer and LocalDev use the same underlying mechanism but at di
 | Concern | LocalDev | Solution-Local Analyzer |
 | --------- | ---------- | ------------------------ |
 | Scope | Cross-repo | Intra-solution |
-| Trigger | `.<producer>.user` or `.<producer>.local` sentinel (e.g. `.scribe.user`, `.hermetic.local`) | `ScribeSolutionAnalyzer=true` |
+| Trigger | `.<producer>.scribe` sentinel (e.g. `.scribe.scribe`, `.hermetic.scribe`) | `ScribeSolutionAnalyzer=true` |
 | Version | NBGV + timestamp suffix | Timestamp-only (`0.0.0-dev.yyyyMMddHHmmss`) |
 | Override files | Generated `.Directory.Packages.targets` | Same — generated `.Directory.Packages.targets` |
 | Package directory | Shared `$(ScribeRoot)/.artifacts/packages/` | Solution `$(ArtifactsPath)packages/` |
@@ -171,25 +171,24 @@ All subsequent property groups and imports are conditioned on `'$(_ScribeLocalDe
 
 Two tiers of activation — one per-producer, one umbrella:
 
-**Per-producer (`$(IsLocalProducer)`):** each producer declares `$(ScribesName)` in its Directory.Build.props (e.g. `Scribe`, `Hermetic`). EITHER `.$(ScribesName).user` OR `.$(ScribesName).local` (lowercased, e.g. `.hermetic.user` / `.hermetic.local`) at `$(ScribeRoot)` flips `$(IsLocalProducer)` on for that project. Producer mode gates auto-pack, timestamped versions, and override-file emission.
+**Per-producer (`$(IsLocalProducer)`):** each producer declares `$(ScribesName)` in its Directory.Build.props (e.g. `Scribe`, `Hermetic`). `.$(ScribesName).scribe` (lowercased, e.g. `.hermetic.scribe`) at `$(ScribeRoot)` flips `$(IsLocalProducer)` on for that project. Producer mode gates auto-pack, timestamped versions, and override-file emission.
 
 ```xml
 <PropertyGroup Condition="'$(ScribesName)' != '' and '$(ScribeRoot)' != ''">
-  <_ScribeProducerBase>$(ScribeRoot)\.$(ScribesName.ToLowerInvariant())</_ScribeProducerBase>
+  <_ScribeProducerSentinel>$(ScribeRoot)\.$(ScribesName.ToLowerInvariant()).scribe</_ScribeProducerSentinel>
 </PropertyGroup>
 <PropertyGroup Condition="'$(IsLocalProducer)' != 'true'
-                          and '$(_ScribeProducerBase)' != ''
-                          and (Exists('$(_ScribeProducerBase).user') or Exists('$(_ScribeProducerBase).local'))">
+                          and '$(_ScribeProducerSentinel)' != ''
+                          and Exists('$(_ScribeProducerSentinel)')">
   <IsLocalProducer>true</IsLocalProducer>
 </PropertyGroup>
 ```
 
-**Umbrella (`$(IsLocalScribe)`):** ANY `.*.user` or `.*.local` sentinel at `$(ScribeRoot)` flips `$(IsLocalScribe)` on. The umbrella flag governs consumer-side infrastructure: NuGet source registration and override-file imports.
+**Umbrella (`$(IsLocalScribe)`):** ANY `.*.scribe` sentinel at `$(ScribeRoot)` flips `$(IsLocalScribe)` on. The umbrella flag governs consumer-side infrastructure: NuGet source registration and override-file imports.
 
 ```xml
 <ItemGroup>
-  <_ScribeLocalSentinel Include="$(ScribeRoot)\.*.user" />
-  <_ScribeLocalSentinel Include="$(ScribeRoot)\.*.local" />
+  <_ScribeLocalSentinel Include="$(ScribeRoot)\.*.scribe" />
 </ItemGroup>
 <!-- MSBuild forbids @(ItemList) references in Condition attributes (MSB4099),
      so project the ItemGroup into a property first, then condition on it. -->
@@ -203,9 +202,9 @@ Two tiers of activation — one per-producer, one umbrella:
 
 Three activation methods (umbrella):
 
-1. **Sentinel file (recommended):** Create `.<producer>.user` OR `.<producer>.local` in `$(ScribeRoot)` — e.g. `.scribe.user` to build Scribe locally, `.hermetic.local` to build Hermetic locally. Either form works. Delete to deactivate. Add to `.gitignore`.
+1. **Sentinel file (recommended):** Create `.<producer>.scribe` in `$(ScribeRoot)` — e.g. `.scribe.scribe` to build Scribe locally, `.hermetic.scribe` to build Hermetic locally. Delete to deactivate. Add to `.gitignore` via `*.scribe`.
 
-    **Why two forms?** `.user` is the .NET convention — `*.user` is in the standard [VisualStudio.gitignore](https://github.com/github/gitignore/blob/main/VisualStudio.gitignore), so it won't be accidentally committed. `.local` reads more naturally and matches the JS ecosystem (Vite, Next.js). Both are accepted rather than forcing a choice between idioms.
+    **Why `.scribe`?** The suffix is brand-unique — zero risk of collision with `.user` (VS project user settings) or `.local` (Vite/Next.js/prettier env files) that a future tool might also scan. One `.gitignore` line covers every producer.
 
 2. **Explicit property:** `-p:IsLocalScribe=true` on the command line — consumer infra only. Does not activate any specific producer; pair with a `-p:IsLocalProducer=true` or a sentinel.
 3. **Props file:** `<IsLocalScribe>true</IsLocalScribe>` in Directory.Build.props or Directory.Solution.props.

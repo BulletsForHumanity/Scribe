@@ -10,14 +10,21 @@
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
 
   <!-- Phases. Order matters: Classification sets flags → Validation checks them
-       → Stubs injects polyfills → type-specific phases gate on the flags. -->
+       → type-specific phases only import when the matching flag is set. Gating
+       at the Import level (rather than on every PropertyGroup/Target inside)
+       keeps the per-type files free of per-node conditions that could drift. -->
   <Import Project="$(MSBuildThisFileDirectory)Phases\Classification.targets" />
   <Import Project="$(MSBuildThisFileDirectory)Phases\Validation.targets" />
-  <Import Project="$(MSBuildThisFileDirectory)Phases\Stubs.targets" />
-  <Import Project="$(MSBuildThisFileDirectory)Phases\Library.targets" />
-  <Import Project="$(MSBuildThisFileDirectory)Phases\Companion.targets" />
-  <Import Project="$(MSBuildThisFileDirectory)Phases\Analyzer.targets" />
-  <Import Project="$(MSBuildThisFileDirectory)Phases\Meta.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)Phases\Stubs.targets"
+          Condition="'$(ScribeSdkIncludeStubs)' == 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)Phases\Library.targets"
+          Condition="'$(_IsScribeLibrary)' == 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)Phases\Companion.targets"
+          Condition="'$(_IsScribeCompanion)' == 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)Phases\Analyzer.targets"
+          Condition="'$(_IsScribeAnalyzer)' == 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)Phases\Meta.targets"
+          Condition="'$(_IsScribeMeta)' == 'true'" />
 
   <!-- LocalDev producer-side infrastructure (override-file emission, cleanup). -->
   <Import Project="$(MSBuildThisFileDirectory)..\build\Scribe.LocalDev.targets" />

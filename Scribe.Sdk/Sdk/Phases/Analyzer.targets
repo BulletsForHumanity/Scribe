@@ -11,8 +11,11 @@
       Companion + Library.
   -->
 
+  <!-- This file is only imported when $(_IsScribeAnalyzer) is true (gate lives
+       on the <Import> in Sdk.targets). No per-node conditions needed inside. -->
+
   <!-- ── Analyzer defaults ───────────────────────────────────────────────── -->
-  <PropertyGroup Condition="'$(_IsScribeAnalyzer)' == 'true'">
+  <PropertyGroup>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageType>Analyzer</PackageType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -20,8 +23,7 @@
 
   <!-- ── Own DLL into analyzers/dotnet/cs/ ───────────────────────────────── -->
   <Target Name="_ScribeSdkAddAnalyzerDll"
-          BeforeTargets="_GetPackageFiles"
-          Condition="'$(_IsScribeAnalyzer)' == 'true'">
+          BeforeTargets="_GetPackageFiles">
     <ItemGroup>
       <None Include="$(TargetPath)"
             Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
@@ -31,8 +33,7 @@
   <!-- ── Private dependency DLLs into analyzers/dotnet/cs/ ───────────────── -->
   <Target Name="_ScribeSdkAddAnalyzerDependencies"
           BeforeTargets="_GetPackageFiles"
-          DependsOnTargets="ResolvePackageAssets"
-          Condition="'$(_IsScribeAnalyzer)' == 'true'">
+          DependsOnTargets="ResolvePackageAssets">
     <ItemGroup>
       <_ScribeSdkDep Include="@(ReferenceCopyLocalPaths)"
                      Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != ''
