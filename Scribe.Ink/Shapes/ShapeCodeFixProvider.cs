@@ -24,7 +24,7 @@ internal sealed class ShapeCodeFixProvider : CodeFixProvider
 
     public override ImmutableArray<string> FixableDiagnosticIds => _ids;
 
-    public override FixAllProvider? GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+    public override FixAllProvider? GetFixAllProvider() => ShapeFixAllProvider.Instance;
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
@@ -45,7 +45,7 @@ internal sealed class ShapeCodeFixProvider : CodeFixProvider
                 continue;
             }
 
-            var fix = ResolveFix(fixKind);
+            var fix = FixResolver.Resolve(fixKind);
             if (fix is null)
             {
                 continue;
@@ -67,12 +67,4 @@ internal sealed class ShapeCodeFixProvider : CodeFixProvider
         }
     }
 
-    private static IShapeFix? ResolveFix(FixKind kind) => kind switch
-    {
-        FixKind.AddPartialModifier => new AddPartialModifierFix(),
-        FixKind.AddSealedModifier => new AddSealedModifierFix(),
-        FixKind.AddInterfaceToBaseList => new AddInterfaceToBaseListFix(),
-        FixKind.AddAttribute => new AddAttributeFix(),
-        _ => null,
-    };
 }

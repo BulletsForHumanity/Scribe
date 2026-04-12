@@ -19,6 +19,13 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageType>Analyzer</PackageType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- RS1038: "compiler extension must not reference Workspaces assemblies"
+         fires on any analyzer package that also ships code fixers (which
+         require Microsoft.CodeAnalysis.CSharp.Workspaces). Suppressing here
+         is the canonical resolution for fixer-bearing analyzer packages;
+         consumers that ship analyzers without fixers can re-enable with
+         <NoWarn>$(NoWarn.Replace(';RS1038', ''))</NoWarn>. -->
+    <NoWarn>$(NoWarn);RS1038</NoWarn>
   </PropertyGroup>
 
   <!-- ── Own DLL into analyzers/dotnet/cs/ ───────────────────────────────── -->

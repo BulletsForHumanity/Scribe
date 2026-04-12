@@ -1,22 +1,13 @@
 <!--
-    TODO(dogfood): switch to <Project Sdk="BulletsForHumanity.Scribe.Sdk"> with
-    ScribeSdkProjectType=Meta once the Sdk's project-types support lands
-    (see SCRIBE_SDK_PROJECT_TYPES_REQS.md).
-
-    Scriptorium is a build-time-only source generator that runs during Scribe's
-    own compile to emit Should*/Could*/ShouldNot* variants of each Must* primitive
-    on ShapeBuilder. Never shipped to consumers.
+    Scriptorium is a build-time-only source generator (Meta type) that runs during
+    Scribe's own compile to emit Should*/Could*/ShouldNot* variants of each Must*
+    primitive on ShapeBuilder. Never shipped to consumers.
 -->
-<Project Sdk="Microsoft.NET.Sdk">
+<Project>
+  <Import Project="Sdk.props" Sdk="BulletsForHumanity.Scribe.Sdk" />
+
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <LangVersion>14</LangVersion>
-    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <IsPackable>false</IsPackable>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <IncludeSymbols>false</IncludeSymbols>
-    <DebugType>embedded</DebugType>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ScribeSdkProjectType>Meta</ScribeSdkProjectType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,4 +17,20 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
   </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="BulletsForHumanity.Scribe.Sdk" />
+
+  <!-- Scribe.Sdk 0.5.1's Meta.targets unconditionally forces IsPackable=true,
+       GeneratePackageOnBuild=true, and appends '$(ArtifactsPath)packages' to
+       RestoreAdditionalProjectSources without an Exists() guard — which triggers
+       NU1301 on CI restores of fresh clones (nothing has packed there yet). The
+       SDK source has been updated (Meta defaults to IsPackable=false, and the
+       source registration is now gated on Exists()); this post-Sdk.targets
+       PropertyGroup is the only way to override the bad 0.5.1 behavior. Remove
+       once a newer SDK is published and pinned in global.json. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <RestoreAdditionalProjectSources></RestoreAdditionalProjectSources>
+  </PropertyGroup>
 </Project>

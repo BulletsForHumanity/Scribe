@@ -46,4 +46,22 @@ public enum FixKind
 
     /// <summary>Add a base class to the type declaration (fix property <c>baseClass</c>).</summary>
     AddBaseClass,
+
+    /// <summary>Remove the <c>partial</c> modifier from the type declaration.</summary>
+    RemovePartialModifier,
+
+    /// <summary>Remove the <c>sealed</c> modifier from the type declaration.</summary>
+    RemoveSealedModifier,
+
+    /// <summary>Remove the <c>static</c> modifier from the type declaration.</summary>
+    RemoveStaticModifier,
+
+    /// <summary>Remove an attribute from the declaration (fix property <c>attribute</c>).</summary>
+    RemoveAttribute,
+
+    /// <summary>Change the type's visibility modifier (fix property <c>visibility</c> — <c>public</c>/<c>internal</c>/<c>private</c>).</summary>
+    SetVisibility,
+
+    /// <summary>Add an explicit public parameterless constructor to the type.</summary>
+    AddParameterlessConstructor,
 }

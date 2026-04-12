@@ -73,6 +73,8 @@ If you prefer not to use the SDK, configure your project manually.
 
 Roslyn analyzers and source generators must target **netstandard2.0** — this is a hard requirement from the compiler host.
 
+> **Note:** `Scribe.csproj` itself stays on `Microsoft.NET.Sdk` because it *produces* the Scribe runtime DLL — the Sdk cannot consume the package it ships. This is the one project in the Scribe repo that deliberately diverges from the SDK pattern; all other analyzer/generator projects in the repo (and every consumer downstream) should use `BulletsForHumanity.Scribe.Sdk`.
+
 ### Minimal .csproj
 
 ```xml

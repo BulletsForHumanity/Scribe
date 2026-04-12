@@ -12,6 +12,11 @@
       that consuming projects resolve via a PackageVersion override emitted to
       $(ArtifactsPath)<PackageId>.Directory.Packages.targets.
 
+      Opt out of auto-pack with <IsPackable>false</IsPackable> — useful for
+      solution-internal Meta projects consumed purely via ProjectReference
+      that should never be packaged at all. The override-file emission is
+      also skipped.
+
       The consumer's Directory.Build.targets must import override files via
       wildcard:
         <Import Project="$(ArtifactsPath)*.Directory.Packages.targets"
@@ -32,21 +37,27 @@
   <!-- This file is only imported when $(_IsScribeMeta) is true (gate lives on
        the <Import> in Sdk.targets). No per-node conditions needed inside. -->
 
-  <!-- ── Meta defaults ───────────────────────────────────────────────────── -->
+  <!-- ── Meta defaults (all types) ───────────────────────────────────────── -->
   <PropertyGroup>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageType>Analyzer</PackageType>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
 
+    <!-- Meta projects are solution-internal by default (consumed via ProjectReference).
+         Publishing across repos is opt-in with <IsPackable>true</IsPackable>. -->
+    <IsPackable Condition="'$(IsPackable)' == ''">false</IsPackable>
+    <!-- GeneratePackageOnBuild is gated on IsPackable and overridable by the consumer. -->
+    <GeneratePackageOnBuild Condition="'$(GeneratePackageOnBuild)' == ''">false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <!-- ── Packable-only: timestamped version + auto-pack ──────────────────── -->
+  <!-- Only applies when the consumer opts into publishing across repos. -->
+  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
     <!-- Timestamped dev version — strictly increasing, defeats NuGet cache. -->
     <_ScribeMetaTimestamp>$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))</_ScribeMetaTimestamp>
     <Version>0.0.0-dev.$(_ScribeMetaTimestamp)</Version>
     <PackageVersion>0.0.0-dev.$(_ScribeMetaTimestamp)</PackageVersion>
-
-    <!-- Auto-pack on every build; override Nerdbank.GitVersioning. -->
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <IsPackable>true</IsPackable>
     <NerdbankGitVersioningEnabled>false</NerdbankGitVersioningEnabled>
   </PropertyGroup>
 
@@ -54,6 +65,16 @@
   <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
     <_ScribeMetaArtifactsDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))</_ScribeMetaArtifactsDir>
     <PackageOutputPath>$(_ScribeMetaArtifactsDir)packages\</PackageOutputPath>
+  </PropertyGroup>
+
+  <!-- Register the Meta packages directory as a NuGet source so restore finds
+       sibling Meta-produced packages. Only do this when the directory already
+       exists — NuGet emits NU1301 ("The local source doesn't exist") otherwise,
+       which breaks restore on fresh clones and CI where nothing has been packed
+       yet. The Pack target below is what creates the directory; once it exists,
+       subsequent restores pick it up. -->
+  <PropertyGroup Condition="'$(_ScribeMetaArtifactsDir)' != ''
+                            and Exists('$(_ScribeMetaArtifactsDir)packages')">
     <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(_ScribeMetaArtifactsDir)packages</RestoreAdditionalProjectSources>
   </PropertyGroup>
 

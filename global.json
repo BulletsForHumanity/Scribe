@@ -3,5 +3,8 @@
     "version": "10.0.200",
     "rollForward": "patch",
     "allowPrerelease": false
+  },
+  "msbuild-sdks": {
+    "BulletsForHumanity.Scribe.Sdk": "0.5.1"
   }
 }

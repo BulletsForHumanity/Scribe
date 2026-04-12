@@ -1,4 +1,0 @@
-<Project>
-  <!-- Entry point for NuGet auto-import. Delegates to the shared LocalDev infrastructure. -->
-  <Import Project="$(MSBuildThisFileDirectory)Scribe.LocalDev.targets" />
-</Project>
