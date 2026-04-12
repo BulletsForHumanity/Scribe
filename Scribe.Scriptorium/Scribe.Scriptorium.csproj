@@ -3,11 +3,11 @@
     Scribe's own compile to emit Should*/Could*/ShouldNot* variants of each Must*
     primitive on ShapeBuilder. Never shipped to consumers.
 -->
-<Project>
-  <Import Project="Sdk.props" Sdk="BulletsForHumanity.Scribe.Sdk" />
-
+<Project Sdk="BulletsForHumanity.Scribe.Sdk">
   <PropertyGroup>
     <ScribeSdkProjectType>Meta</ScribeSdkProjectType>
+    <PackageId>BulletsForHumanity.Scribe.Scriptorium</PackageId>
+    <Description>Build-time-only meta-generator that emits Should*/Could*/ShouldNot* variants of each Must* primitive on Scribe's ShapeBuilder. Consumed solution-internally by Scribe via local -dev PackageReference for VS analyzer hot-refresh.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,22 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="" />
+    <None Include="..\README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
-  <Import Project="Sdk.targets" Sdk="BulletsForHumanity.Scribe.Sdk" />
-
-  <!-- Scribe.Sdk 0.5.1's Meta.targets unconditionally forces IsPackable=true,
-       GeneratePackageOnBuild=true, and appends '$(ArtifactsPath)packages' to
-       RestoreAdditionalProjectSources without an Exists() guard — which triggers
-       NU1301 on CI restores of fresh clones (nothing has packed there yet). The
-       SDK source has been updated (Meta defaults to IsPackable=false, and the
-       source registration is now gated on Exists()); this post-Sdk.targets
-       PropertyGroup is the only way to override the bad 0.5.1 behavior. Remove
-       once a newer SDK is published and pinned in global.json. -->
-  <PropertyGroup>
-    <IsPackable>false</IsPackable>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <RestoreAdditionalProjectSources></RestoreAdditionalProjectSources>
-  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

@@ -19,7 +19,7 @@ namespace Scribe.Tests.Shapes;
 
 /// <summary>
 ///     Exercises the Phase 8 extensions to the <c>MustBe*</c>/<c>MustNot*</c>
-///     catalog: analyzer emissions for SCRIBE006–012 and the matching code
+///     catalog: analyzer emissions for SCRIBE015–012 and the matching code
 ///     fix application. Each test pairs an analyzer assertion with a fix
 ///     assertion where a fix exists.
 /// </summary>
@@ -28,7 +28,7 @@ public class ShapePhase8PrimitivesTests
     private readonly record struct Collected(string Fqn);
 
     [Fact]
-    public void MustBeAbstract_emits_SCRIBE006_with_AddAbstractModifier_fix_kind()
+    public void MustBeAbstract_emits_SCRIBE015_with_AddAbstractModifier_fix_kind()
     {
         var shape = Shape.Class()
             .MustBeAbstract()
@@ -37,7 +37,7 @@ public class ShapePhase8PrimitivesTests
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE006");
+        diagnostics[0].Id.ShouldBe("SCRIBE015");
         diagnostics[0].Properties["fixKind"].ShouldBe("AddAbstractModifier");
     }
 
@@ -63,7 +63,7 @@ public class ShapePhase8PrimitivesTests
     }
 
     [Fact]
-    public void MustBeStatic_emits_SCRIBE007_with_AddStaticModifier_fix_kind()
+    public void MustBeStatic_emits_SCRIBE017_with_AddStaticModifier_fix_kind()
     {
         var shape = Shape.Class()
             .MustBeStatic()
@@ -72,7 +72,7 @@ public class ShapePhase8PrimitivesTests
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE007");
+        diagnostics[0].Id.ShouldBe("SCRIBE017");
         diagnostics[0].Properties["fixKind"].ShouldBe("AddStaticModifier");
     }
 
@@ -88,7 +88,7 @@ public class ShapePhase8PrimitivesTests
     }
 
     [Fact]
-    public void MustExtend_emits_SCRIBE008_and_encodes_base_class_in_fix_properties()
+    public void MustExtend_emits_SCRIBE009_and_encodes_base_class_in_fix_properties()
     {
         var shape = Shape.Class()
             .MustHaveAttribute("MarkerAttribute")
@@ -101,7 +101,7 @@ public class MyBase { }
 [Marker] public class Widget { }
 ";
         var diagnostics = RunAnalyzer(shape, source)
-            .Where(d => d.Id == "SCRIBE008")
+            .Where(d => d.Id == "SCRIBE009")
             .ToArray();
 
         diagnostics.Length.ShouldBe(1);
@@ -122,7 +122,7 @@ public sealed class MarkerAttribute : System.Attribute { }
 public class MyBase { }
 [Marker] public class Widget : MyBase { }
 ";
-        RunAnalyzer(shape, source).Where(d => d.Id == "SCRIBE008").ShouldBeEmpty();
+        RunAnalyzer(shape, source).Where(d => d.Id == "SCRIBE009").ShouldBeEmpty();
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class MyBase { }
     }
 
     [Fact]
-    public void MustBeInNamespace_emits_SCRIBE009_with_no_fix()
+    public void MustBeInNamespace_emits_SCRIBE027_with_no_fix()
     {
         var shape = Shape.Class()
             .MustBeInNamespace(@"^MyApp\.Domain(\..*)?$")
@@ -155,7 +155,7 @@ namespace MyApp.Other { public class Widget { } }
 ";
         var diagnostics = RunAnalyzer(shape, source);
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE009");
+        diagnostics[0].Id.ShouldBe("SCRIBE027");
         diagnostics[0].Properties["fixKind"].ShouldBe("None");
     }
 
@@ -173,7 +173,7 @@ namespace MyApp.Domain.Things { public class Widget { } }
     }
 
     [Fact]
-    public void MustNotBeAbstract_emits_SCRIBE010_with_RemoveAbstractModifier_fix()
+    public void MustNotBeAbstract_emits_SCRIBE016_with_RemoveAbstractModifier_fix()
     {
         var shape = Shape.Class()
             .MustNotBeAbstract()
@@ -181,7 +181,7 @@ namespace MyApp.Domain.Things { public class Widget { } }
 
         var diagnostics = RunAnalyzer(shape, "public abstract class Widget { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE010");
+        diagnostics[0].Id.ShouldBe("SCRIBE016");
         diagnostics[0].Properties["fixKind"].ShouldBe("RemoveAbstractModifier");
     }
 
@@ -198,7 +198,7 @@ namespace MyApp.Domain.Things { public class Widget { } }
     }
 
     [Fact]
-    public void MustNotBeGeneric_emits_SCRIBE011_with_no_fix_on_generic_class()
+    public void MustNotBeGeneric_emits_SCRIBE024_with_no_fix_on_generic_class()
     {
         var shape = Shape.Class()
             .MustNotBeGeneric()
@@ -206,7 +206,7 @@ namespace MyApp.Domain.Things { public class Widget { } }
 
         var diagnostics = RunAnalyzer(shape, "public class Widget<T> { }");
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE011");
+        diagnostics[0].Id.ShouldBe("SCRIBE024");
         diagnostics[0].Properties["fixKind"].ShouldBe("None");
     }
 
@@ -221,7 +221,7 @@ namespace MyApp.Domain.Things { public class Widget { } }
     }
 
     [Fact]
-    public void MustNotImplement_emits_SCRIBE012_and_encodes_interface_for_fix()
+    public void MustNotImplement_emits_SCRIBE008_and_encodes_interface_for_fix()
     {
         var shape = Shape.Class()
             .MustNotImplement("System.IDisposable")
@@ -230,7 +230,7 @@ namespace MyApp.Domain.Things { public class Widget { } }
         var source = "public class Widget : System.IDisposable { public void Dispose() { } }";
         var diagnostics = RunAnalyzer(shape, source);
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE012");
+        diagnostics[0].Id.ShouldBe("SCRIBE008");
         diagnostics[0].Properties["fixKind"].ShouldBe("RemoveFromBaseList");
         diagnostics[0].Properties["interface"].ShouldBe("System.IDisposable");
     }

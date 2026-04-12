@@ -63,8 +63,14 @@ public sealed partial class Shape<TModel>
     internal string? PrimaryAttributeName => _primaryAttributeMetadataName;
     internal ShapeCheck[] CheckList => _checks;
 
-    [DiagnosticAnalyzer(Microsoft.CodeAnalysis.LanguageNames.CSharp)]
+    // RS1001 flags DiagnosticAnalyzer subclasses missing [DiagnosticAnalyzer]. This nested
+    // class is intentionally unattributed: as a nested type of an open generic it would
+    // throw CS8032 at consumer analyzer load if Roslyn tried to Activator.CreateInstance
+    // it. Consumers are expected to wrap the ToAnalyzer() instance in their own concrete,
+    // attributed subclass (see class-level XML doc).
+#pragma warning disable RS1001
     private sealed class ShapeDiagnosticAnalyzer : DiagnosticAnalyzer
+#pragma warning restore RS1001
     {
         private readonly Shape<TModel> _shape;
 

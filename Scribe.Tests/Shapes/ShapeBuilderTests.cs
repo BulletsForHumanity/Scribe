@@ -149,7 +149,7 @@ public class ShapeBuilderTests
         var diags = RunChecks(Shape.Class().MustBeSealed(), symbol);
 
         diags.Count.ShouldBe(1);
-        diags[0].Id.ShouldBe("SCRIBE002");
+        diags[0].Id.ShouldBe("SCRIBE005");
     }
 
     [Fact]
@@ -179,7 +179,7 @@ public class ShapeBuilderTests
         var diags = RunChecks(Shape.Class().MustImplement<System.IDisposable>(), symbol);
 
         diags.Count.ShouldBe(1);
-        diags[0].Id.ShouldBe("SCRIBE003");
+        diags[0].Id.ShouldBe("SCRIBE007");
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class ShapeBuilderTests
         var diags = RunChecks(Shape.Class().MustHaveAttribute("FooAttribute"), symbol);
 
         diags.Count.ShouldBe(1);
-        diags[0].Id.ShouldBe("SCRIBE004");
+        diags[0].Id.ShouldBe("SCRIBE003");
     }
 
     [Fact]
@@ -252,7 +252,7 @@ public class ShapeBuilderTests
         var diags = RunChecks(Shape.Class().MustBeNamed(".*Handler$"), symbol);
 
         diags.Count.ShouldBe(1);
-        diags[0].Id.ShouldBe("SCRIBE005");
+        diags[0].Id.ShouldBe("SCRIBE029");
     }
 
     // ───────────────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ public class ShapeBuilderTests
         var diags = RunChecks(builder, symbol);
         diags.Count.ShouldBe(3);
         var ids = diags.AsSpan().ToArray().Select(d => d.Id).ToHashSet();
-        ids.ShouldBe(new System.Collections.Generic.HashSet<string> { "SCRIBE001", "SCRIBE002", "SCRIBE005" });
+        ids.ShouldBe(new System.Collections.Generic.HashSet<string> { "SCRIBE001", "SCRIBE005", "SCRIBE029" });
     }
 
     [Fact]

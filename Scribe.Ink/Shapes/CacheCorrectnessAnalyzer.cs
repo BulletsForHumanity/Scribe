@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.Operations;
 namespace Scribe.Ink.Shapes;
 
 /// <summary>
-///     SCRIBE101 — forbid Roslyn reference types on any TModel passed to
+///     SCRIBE200 — forbid Roslyn reference types on any TModel passed to
 ///     <c>Shape&lt;TModel&gt;.Project&lt;TModel&gt;</c>. Holding an <c>ISymbol</c>,
 ///     <c>SyntaxNode</c>, <c>Compilation</c>, <c>SemanticModel</c>, <c>SyntaxTree</c>,
 ///     <c>Location</c>, or <c>AttributeData</c> in a cached model defeats the
@@ -17,7 +17,7 @@ namespace Scribe.Ink.Shapes;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class CacheCorrectnessAnalyzer : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "SCRIBE101";
+    public const string DiagnosticId = "SCRIBE200";
 
     private static readonly DiagnosticDescriptor Descriptor = new(
         id: DiagnosticId,

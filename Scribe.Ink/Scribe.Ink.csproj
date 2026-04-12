@@ -1,26 +1,25 @@
 <Project Sdk="BulletsForHumanity.Scribe.Sdk">
+  <!--
+      Scribe.Ink — Companion to Scribe.
+
+      Ships inside BulletsForHumanity.Scribe at analyzers/dotnet/cs/ via the
+      <ScribeCompanion> reference in Scribe.csproj. Never produces its own
+      nupkg. The scribe dips the quill in ink to mark, correct, and emend.
+  -->
   <PropertyGroup>
-    <ScribeSdkProjectType>Analyzer</ScribeSdkProjectType>
+    <ScribeSdkProjectType>Companion</ScribeSdkProjectType>
     <ImplicitUsings>enable</ImplicitUsings>
     <!--
-        RS1038: Workspaces-referencing assembly hosting an analyzer. We split usage
+        RS1038: Workspaces-referencing assembly hosting an analyzer. Usage is split
         by class (analyzers don't touch Workspaces types; fixers do), so the Roslyn
-        host loads both happily. The blanket rule is conservative, so suppress it.
+        host loads both happily. The blanket rule is conservative — suppress it.
         RS2008: analyzer release tracking is overkill for a small, versioned package.
     -->
     <NoWarn>$(NoWarn);RS1038;RS2008</NoWarn>
-    <PackageId>BulletsForHumanity.Scribe.Ink</PackageId>
-    <Description>Roslyn analyzers, code fix providers, and source generators for Scribe shapes. The scribe dips the quill in ink to mark, correct, and emend.</Description>
-    <PackageTags>roslyn;analyzer;code-fix;source-generator;scribe</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Scribe.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\LICENSE" Pack="true" PackagePath="" />
-    <None Include="..\README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <ItemGroup>

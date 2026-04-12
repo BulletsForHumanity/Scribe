@@ -69,11 +69,24 @@
       AssemblyLoadContext needs private dependency DLLs alongside the main one.
       TargetPathWithTargetPlatformMoniker carries them across the reference
       boundary.
+
+      Filter matches GetAnalyzerFiles: only .dll files (excluding .xml docs,
+      which break CSC as /reference with CS0009), and excluding Roslyn host
+      assemblies + System.Collections.Immutable. The latter is critical — it
+      ships as a package on netstandard2.0 (v9.0.0) but is in-box on net10+
+      (v10.0.0); exporting v9 to a net10 consumer causes CS0433 duplicate-type
+      errors on ImmutableArray<T>.
   -->
   <Target Name="GetDependencyTargetPaths">
     <ItemGroup>
       <TargetPathWithTargetPlatformMoniker Include="@(ReferenceCopyLocalPaths)"
-                                           IncludeRuntimeDependency="false" />
+                                           IncludeRuntimeDependency="false"
+                                           Condition="'%(Extension)' == '.dll'
+                                                      and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.Common'
+                                                      and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.CSharp'
+                                                      and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.CSharp.Workspaces'
+                                                      and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'Microsoft.CodeAnalysis.Workspaces.Common'
+                                                      and '%(ReferenceCopyLocalPaths.NuGetPackageId)' != 'System.Collections.Immutable'" />
     </ItemGroup>
   </Target>
 </Project>

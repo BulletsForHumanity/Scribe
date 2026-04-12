@@ -56,7 +56,7 @@ public class ShapeAnalyzerTests
     }
 
     [Fact]
-    public void MustBeSealed_emits_SCRIBE002_at_type_keyword()
+    public void MustBeSealed_emits_SCRIBE005_at_type_keyword()
     {
         var shape = Shape.Class()
             .MustBeSealed()
@@ -65,12 +65,12 @@ public class ShapeAnalyzerTests
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
         diagnostics.Length.ShouldBe(1);
-        diagnostics[0].Id.ShouldBe("SCRIBE002");
+        diagnostics[0].Id.ShouldBe("SCRIBE005");
         diagnostics[0].Properties["fixKind"].ShouldBe("AddSealedModifier");
     }
 
     [Fact]
-    public void Secondary_MustHaveAttribute_emits_SCRIBE004_and_encodes_attribute_name_in_properties()
+    public void Secondary_MustHaveAttribute_emits_SCRIBE003_and_encodes_attribute_name_in_properties()
     {
         // First MustHaveAttribute is promoted to the selector — it narrows the shape's
         // scope to types that carry ThingAttribute. A second MustHaveAttribute runs as
@@ -89,7 +89,7 @@ public sealed class MarkerAttribute : System.Attribute { }
 
         diagnostics.Length.ShouldBe(1);
         var diag = diagnostics[0];
-        diag.Id.ShouldBe("SCRIBE004");
+        diag.Id.ShouldBe("SCRIBE003");
         diag.Properties["fixKind"].ShouldBe("AddAttribute");
         diag.Properties["attribute"].ShouldBe("MarkerAttribute");
     }
@@ -106,7 +106,7 @@ public sealed class MarkerAttribute : System.Attribute { }
 
         diagnostics.Length.ShouldBe(1);
         var diag = diagnostics[0];
-        diag.Id.ShouldBe("SCRIBE003");
+        diag.Id.ShouldBe("SCRIBE007");
         diag.Properties["fixKind"].ShouldBe("AddInterfaceToBaseList");
         diag.Properties["interface"].ShouldBe("System.IDisposable");
         var text = source.Substring(diag.Location.SourceSpan.Start, diag.Location.SourceSpan.Length);
