@@ -1,0 +1,13 @@
+<Project>
+  <!--
+      NuGet auto-import entry point for the BulletsForHumanity.Scribe package
+      (late phase). Counterpart to BulletsForHumanity.Scribe.props.
+
+      Chains into Scribe.LocalDev.targets so consumers get the CPM version
+      override imports ($(ScribeArtifactsDir)*.Directory.Packages.targets)
+      and the producer-side cleanup/emit logic when this project is itself
+      part of a producer set.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)Scribe.LocalDev.targets"
+          Condition="Exists('$(MSBuildThisFileDirectory)Scribe.LocalDev.targets')" />
+</Project>

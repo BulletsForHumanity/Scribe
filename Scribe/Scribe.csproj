@@ -20,6 +20,14 @@
   <ItemGroup>
     <None Include="..\LICENSE" Pack="true" PackagePath="" />
     <None Include="..\README.md" Pack="true" PackagePath="" />
+    <!-- Pack LocalDev props/targets so NuGet auto-imports them for any consumer
+         regardless of whether the project uses Scribe.Sdk or Microsoft.NET.Sdk.
+         build/BulletsForHumanity.Scribe.{props,targets} are the PackageId-named
+         entry points NuGet auto-imports; they chain into Scribe.LocalDev.*. -->
+    <None Include="build\BulletsForHumanity.Scribe.props" Pack="true" PackagePath="build\" />
+    <None Include="build\BulletsForHumanity.Scribe.targets" Pack="true" PackagePath="build\" />
+    <None Include="build\Scribe.LocalDev.props" Pack="true" PackagePath="build\" />
+    <None Include="build\Scribe.LocalDev.targets" Pack="true" PackagePath="build\" />
   </ItemGroup>
 
   <ItemGroup>

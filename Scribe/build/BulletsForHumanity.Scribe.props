@@ -1,0 +1,18 @@
+<Project>
+  <!--
+      NuGet auto-import entry point for the BulletsForHumanity.Scribe package.
+
+      NuGet looks for build/<PackageId>.props when a project PackageReferences
+      this package, and imports it early (before user targets). We chain here
+      into Scribe.LocalDev.props so every consumer — regardless of whether
+      they use the Scribe.Sdk or Microsoft.NET.Sdk — gets the LocalDev
+      consumer-side infrastructure (IsLocalScribe detection, additional
+      NuGet source registration).
+
+      $(ScribeRoot) and $(ScribesName) must be set by the consumer's
+      Directory.Build.props BEFORE this auto-import fires; otherwise the
+      file is a no-op.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)Scribe.LocalDev.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)Scribe.LocalDev.props')" />
+</Project>
