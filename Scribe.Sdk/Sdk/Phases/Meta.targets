@@ -51,35 +51,40 @@
     <IsPackable Condition="'$(IsPackable)' == ''">true</IsPackable>
   </PropertyGroup>
 
-  <!-- ── Packable-only: timestamped version + auto-pack ──────────────────── -->
-  <!-- Only applies when the consumer opts into publishing across repos. -->
-  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
-    <!-- Timestamped dev version — strictly increasing, defeats NuGet cache. -->
-    <_ScribeMetaTimestamp>$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))</_ScribeMetaTimestamp>
-    <Version>0.0.0-dev.$(_ScribeMetaTimestamp)</Version>
-    <PackageVersion>0.0.0-dev.$(_ScribeMetaTimestamp)</PackageVersion>
-    <NerdbankGitVersioningEnabled>false</NerdbankGitVersioningEnabled>
+  <!-- ── Workspace-shared artifacts directory ────────────────────────────── -->
+  <!-- Meta is a local-dev-only construct. It always targets the shared
+       $(ScribeArtifactsDir) so sibling consumers find the -dev.* nupkg via the
+       wildcard-imported $(PackageId).Directory.Packages.targets override.
+       Derive from $(ScribeRoot) directly — we don't depend on LocalDev having
+       fired, because Meta projects must behave the same whether the sentinel
+       is present or not. -->
+  <PropertyGroup Condition="'$(ScribeArtifactsDir)' == '' and '$(ScribeRoot)' != ''">
+    <ScribeArtifactsDir>$(ScribeRoot)\.artifacts\</ScribeArtifactsDir>
+    <ScribePackagesDir>$(ScribeArtifactsDir)packages\</ScribePackagesDir>
   </PropertyGroup>
 
-  <!-- ── Artifacts directory (normalized with trailing slash) ────────────── -->
-  <!-- Only route PackageOutputPath to $(ArtifactsPath) when no stronger setter
-       has fired. LocalDev.props sets it to the shared $(ScribePackagesDir) in
-       producer mode — that must win so sibling consumers find the -dev.* pkg
-       via the Directory.Packages.targets override file. -->
-  <PropertyGroup Condition="'$(ArtifactsPath)' != ''">
-    <_ScribeMetaArtifactsDir>$([MSBuild]::EnsureTrailingSlash('$(ArtifactsPath)'))</_ScribeMetaArtifactsDir>
-    <PackageOutputPath Condition="'$(PackageOutputPath)' == ''">$(_ScribeMetaArtifactsDir)packages\</PackageOutputPath>
+  <!-- ── Debug auto-pack (sentinel-independent) ──────────────────────────── -->
+  <!-- Meta's entire reason to exist is build-time-only consumption inside the
+       workspace. In Debug we always auto-pack and route to the shared packages
+       dir so consumers resolve the freshest build via VersionOverride. No
+       sentinel is required — Meta is always "in local mode" when Debug and
+       $(ScribeRoot) is set. IsLocalScribe is forced so LocalDev.targets'
+       consumer-side wildcard import picks up this override file too. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'
+                            and '$(IsPackable)' == 'true'
+                            and '$(ScribePackagesDir)' != ''">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageOutputPath>$(ScribePackagesDir)</PackageOutputPath>
+    <IsLocalScribe Condition="'$(IsLocalScribe)' != 'true'">true</IsLocalScribe>
   </PropertyGroup>
 
-  <!-- Register the Meta packages directory as a NuGet source so restore finds
+  <!-- Register the shared packages directory as a NuGet source so restore finds
        sibling Meta-produced packages. Only do this when the directory already
-       exists — NuGet emits NU1301 ("The local source doesn't exist") otherwise,
-       which breaks restore on fresh clones and CI where nothing has been packed
-       yet. The Pack target below is what creates the directory; once it exists,
-       subsequent restores pick it up. -->
-  <PropertyGroup Condition="'$(_ScribeMetaArtifactsDir)' != ''
-                            and Exists('$(_ScribeMetaArtifactsDir)packages')">
-    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(_ScribeMetaArtifactsDir)packages</RestoreAdditionalProjectSources>
+       exists — NuGet emits NU1301 ("The local source doesn't exist") otherwise.
+       The Pack target below creates the directory; subsequent restores pick up. -->
+  <PropertyGroup Condition="'$(ScribePackagesDir)' != ''
+                            and Exists('$(ScribePackagesDir)')">
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(ScribePackagesDir)</RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <!-- ── Own DLL + private deps into analyzers/dotnet/cs/ ────────────────── -->
@@ -113,14 +118,19 @@
   </Target>
 
   <!-- ── Emit PackageVersion override file after Pack ────────────────────── -->
+  <!-- Writes to the workspace-shared $(ScribeArtifactsDir) so MetaConsumer
+       resolves via the wildcard import in LocalDev.targets. When the full
+       LocalDev sentinel is also active, LocalDev.targets skips its own
+       override emission for Meta projects (see guard there) to avoid writing
+       the same file twice. -->
   <Target Name="_ScribeSdkMetaOverride"
           AfterTargets="Pack"
-          Condition="'$(_ScribeMetaArtifactsDir)' != ''
+          Condition="'$(ScribeArtifactsDir)' != ''
                      and '$(PackageId)' != ''">
     <PropertyGroup>
       <_ScribeMetaOverrideVersion>$(NuGetPackageVersion)</_ScribeMetaOverrideVersion>
       <_ScribeMetaOverrideVersion Condition="'$(_ScribeMetaOverrideVersion)' == ''">$(PackageVersion)</_ScribeMetaOverrideVersion>
-      <_ScribeMetaOverridePath>$(_ScribeMetaArtifactsDir)$(PackageId).Directory.Packages.targets</_ScribeMetaOverridePath>
+      <_ScribeMetaOverridePath>$(ScribeArtifactsDir)$(PackageId).Directory.Packages.targets</_ScribeMetaOverridePath>
     </PropertyGroup>
     <ItemGroup>
       <_ScribeMetaOverrideLine Include="&lt;Project&gt;" />
@@ -130,7 +140,7 @@
       <_ScribeMetaOverrideLine Include="  &lt;/ItemGroup&gt;" />
       <_ScribeMetaOverrideLine Include="&lt;/Project&gt;" />
     </ItemGroup>
-    <MakeDir Directories="$(_ScribeMetaArtifactsDir)" />
+    <MakeDir Directories="$(ScribeArtifactsDir)" />
     <WriteLinesToFile File="$(_ScribeMetaOverridePath)"
                       Lines="@(_ScribeMetaOverrideLine)"
                       Overwrite="true"

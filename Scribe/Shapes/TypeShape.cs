@@ -11,53 +11,337 @@ using Scribe.Cache;
 namespace Scribe.Shapes;
 
 /// <summary>
-///     Fluent builder that accumulates a conjunction of <c>MustBeX</c> checks on a single
-///     type-shape subject and projects the match into a cache-safe <c>TModel</c>.
+///     Focused authoring Shape over a type declaration. Accumulates a conjunction of
+///     <c>MustBeX</c> checks and seals the match into a cache-safe <c>TModel</c> via
+///     <see cref="Etch{TModel}"/>.
 /// </summary>
 /// <remarks>
-///     <para>Obtain via the factories on <see cref="Shape"/>.</para>
+///     <para>Obtain via the <c>Expose*</c> factories on <see cref="Stencil"/>.</para>
 ///     <para>Each primitive is a declarative constraint: the check carries a default
 ///     diagnostic ID, title, message, severity, squiggle anchor, and fix hint; callers
 ///     can selectively override any of these via a <see cref="DiagnosticSpec"/>.</para>
 /// </remarks>
-public sealed partial class ShapeBuilder
+public sealed partial class TypeShape
 {
     private readonly TypeKindFilter _kind;
     private readonly List<ShapeCheck> _checks = new();
     private readonly List<MemberCheck> _memberChecks = new();
+    private readonly List<ILensBranch<TypeFocus>> _lensBranches = new();
     private string? _primaryAttributeMetadataName;
     private string? _primaryInterfaceMetadataName;
 
-    internal ShapeBuilder(TypeKindFilter kind) => _kind = kind;
+    internal TypeShape(TypeKindFilter kind) => _kind = kind;
 
     internal TypeKindFilter Kind => _kind;
     internal IReadOnlyList<ShapeCheck> Checks => _checks;
     internal IReadOnlyList<MemberCheck> MemberChecks => _memberChecks;
+    internal IReadOnlyList<ILensBranch<TypeFocus>> LensBranches => _lensBranches;
     internal string? PrimaryAttributeMetadataName => _primaryAttributeMetadataName;
     internal string? PrimaryInterfaceMetadataName => _primaryInterfaceMetadataName;
 
+    internal void AddLensBranch(ILensBranch<TypeFocus> branch) =>
+        _lensBranches.Add(branch ?? throw new ArgumentNullException(nameof(branch)));
+
     /// <summary>
-    ///     Seal the builder and project matches into a cache-safe model.
-    ///     The projection runs inside the incremental pipeline's transform stage, with
+    ///     Compose this <see cref="TypeShape"/> with one or more sibling alternatives
+    ///     into a <see cref="OneOfTypeShape"/>. The caller can then seal the
+    ///     disjunction with <see cref="OneOfTypeShape.Etch{TModel}"/>.
+    /// </summary>
+    /// <param name="others">Additional alternatives. At least one must be supplied.</param>
+    public OneOfTypeShape OneOf(params TypeShape[] others)
+    {
+        if (others is null || others.Length == 0)
+        {
+            throw new ArgumentException("OneOf requires at least one sibling alternative.", nameof(others));
+        }
+
+        var all = new TypeShape[others.Length + 1];
+        all[0] = this;
+        Array.Copy(others, 0, all, 1, others.Length);
+        return new OneOfTypeShape(all, fusionSpec: null);
+    }
+
+    /// <summary>
+    ///     Overload of <see cref="OneOf(TypeShape[])"/> that accepts a
+    ///     <see cref="DiagnosticSpec"/> override for the fused diagnostic.
+    /// </summary>
+    public OneOfTypeShape OneOf(DiagnosticSpec fusionSpec, params TypeShape[] others)
+    {
+        if (others is null || others.Length == 0)
+        {
+            throw new ArgumentException("OneOf requires at least one sibling alternative.", nameof(others));
+        }
+
+        var all = new TypeShape[others.Length + 1];
+        all[0] = this;
+        Array.Copy(others, 0, all, 1, others.Length);
+        return new OneOfTypeShape(all, fusionSpec);
+    }
+
+    /// <summary>
+    ///     Etch the authoring chain into a sealed <see cref="Shape{TModel}"/>, permanently
+    ///     committing the accumulated predicates, lenses, and member checks and producing
+    ///     a cache-safe <typeparamref name="TModel"/> for each surviving match.
+    ///     The etch callback runs inside the incremental pipeline's transform stage, with
     ///     access to the matched symbol, semantic model, and — if declared — the
     ///     driving attribute reader.
     /// </summary>
     /// <typeparam name="TModel">Must be <see cref="IEquatable{T}"/> for cache correctness.</typeparam>
-    public Shape<TModel> Project<TModel>(ProjectionDelegate<TModel> project)
+    public Shape<TModel> Etch<TModel>(EtchDelegate<TModel> etch)
         where TModel : IEquatable<TModel>
     {
-        if (project is null)
+        if (etch is null)
         {
-            throw new ArgumentNullException(nameof(project));
+            throw new ArgumentNullException(nameof(etch));
         }
 
         return new Shape<TModel>(
             kind: _kind,
             checks: _checks.ToArray(),
             memberChecks: _memberChecks.ToArray(),
+            lensBranches: _lensBranches.ToArray(),
             primaryAttributeMetadataName: _primaryAttributeMetadataName,
             primaryInterfaceMetadataName: _primaryInterfaceMetadataName,
-            project: project);
+            etch: etch);
+    }
+
+    /// <summary>
+    ///     Enter the attributes lens: navigate every attribute application on the matched
+    ///     type whose class FQN equals <paramref name="attributeFqn"/>, optionally
+    ///     declaring further predicates or sub-lens hops through the
+    ///     <paramref name="configure"/> callback. Declares a presence constraint when
+    ///     <paramref name="min"/> / <paramref name="max"/> are supplied.
+    /// </summary>
+    /// <param name="attributeFqn">Fully-qualified attribute class name. Open-generic forms are matched by the bare name before <c>&lt;</c>.</param>
+    /// <param name="configure">Optional callback receiving the nested <see cref="FocusShape{AttributeFocus}"/> for per-application checks and deeper navigation.</param>
+    /// <param name="min">Minimum number of attribute applications required on the type. <c>0</c> (default) disables the lower bound.</param>
+    /// <param name="max">Maximum allowed. <see langword="null"/> (default) disables the upper bound.</param>
+    /// <param name="presenceSpec">Override for the presence-violation diagnostic descriptor.</param>
+    /// <param name="quantifier">How nested-check results aggregate across navigated attribute applications — <see cref="Quantifier.All"/> (default) emits per-child violations; <see cref="Quantifier.Any"/> requires at least one application to pass; <see cref="Quantifier.None"/> requires every application to fail.</param>
+    /// <param name="quantifierSpec">Override for the aggregate diagnostic emitted when <paramref name="quantifier"/> is <see cref="Quantifier.Any"/> or <see cref="Quantifier.None"/>. Ignored for <see cref="Quantifier.All"/>.</param>
+    public TypeShape Attributes(
+        string attributeFqn,
+        Action<FocusShape<AttributeFocus>>? configure = null,
+        int min = 0,
+        int? max = null,
+        DiagnosticSpec? presenceSpec = null,
+        Quantifier quantifier = Quantifier.All,
+        DiagnosticSpec? quantifierSpec = null)
+    {
+        if (string.IsNullOrEmpty(attributeFqn))
+        {
+            throw new ArgumentException("Attribute FQN must not be empty.", nameof(attributeFqn));
+        }
+
+        if (min < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(min), "Minimum count must be non-negative.");
+        }
+
+        if (max is { } m && m < min)
+        {
+            throw new ArgumentOutOfRangeException(nameof(max), "Maximum count must be at least the minimum.");
+        }
+
+        var nested = new FocusShape<AttributeFocus>();
+        configure?.Invoke(nested);
+        var lens = Lenses.BuiltinLenses.Attributes(attributeFqn);
+
+        LensPresenceSpec? presence = null;
+        var hasPresence = min > 0 || max is not null || presenceSpec is not null;
+        if (hasPresence)
+        {
+            presence = new LensPresenceSpec(
+                Id: InternPool.Intern(presenceSpec?.Id ?? "SCRIBE050"),
+                Title: presenceSpec?.Title ?? "Attribute presence constraint",
+                MessageFormat: presenceSpec?.Message
+                    ?? "Expected [{0}..{1}] applications of attribute '" + attributeFqn + "', observed {2}",
+                Severity: presenceSpec?.Severity ?? DiagnosticSeverity.Error);
+        }
+
+        var quantifierDescriptor = BuildQuantifierSpec(
+            quantifier,
+            quantifierSpec,
+            defaultId: quantifier == Quantifier.Any ? "SCRIBE092" : "SCRIBE093",
+            defaultMessage: quantifier == Quantifier.Any
+                ? "At least one application of attribute '" + attributeFqn + "' must satisfy the required checks"
+                : "No application of attribute '" + attributeFqn + "' may satisfy the disallowed checks");
+
+        _lensBranches.Add(new LensBranch<TypeFocus, AttributeFocus>(
+            Lens: lens,
+            Nested: nested,
+            MinCount: min,
+            MaxCount: max,
+            Presence: presence,
+            ParentOrigin: parent => parent.Origin,
+            Quantifier: quantifier,
+            QuantifierSpec: quantifierDescriptor,
+            HopDescription: "Attributes(\"" + attributeFqn + "\")"));
+
+        return this;
+    }
+
+    internal static LensQuantifierSpec? BuildQuantifierSpec(
+        Quantifier quantifier,
+        DiagnosticSpec? spec,
+        string defaultId,
+        string defaultMessage)
+    {
+        if (quantifier == Quantifier.All)
+        {
+            return null;
+        }
+
+        return new LensQuantifierSpec(
+            Id: InternPool.Intern(spec?.Id ?? defaultId),
+            Title: spec?.Title ?? (quantifier == Quantifier.Any
+                ? "Any-quantifier aggregate"
+                : "None-quantifier aggregate"),
+            MessageFormat: spec?.Message ?? defaultMessage,
+            Severity: spec?.Severity ?? DiagnosticSeverity.Error);
+    }
+
+    /// <summary>
+    ///     Enter the members lens: navigate every directly-declared member of the
+    ///     matched type in source order, optionally filtered by
+    ///     <see cref="SymbolKind"/> (field, property, method, event, nested type).
+    ///     Declares a presence constraint when <paramref name="min"/> /
+    ///     <paramref name="max"/> are supplied.
+    /// </summary>
+    /// <param name="kind">Restrict navigation to one member kind. <see langword="null"/> (default) navigates every declared member regardless of kind.</param>
+    /// <param name="configure">Optional callback receiving the nested <see cref="FocusShape{MemberFocus}"/> for per-member checks.</param>
+    /// <param name="min">Minimum member count required on the type.</param>
+    /// <param name="max">Maximum member count allowed. <see langword="null"/> disables the upper bound.</param>
+    /// <param name="presenceSpec">Override for the presence-violation diagnostic descriptor.</param>
+    /// <param name="quantifier">How nested-check results aggregate across navigated members — <see cref="Quantifier.All"/> (default) emits per-child violations; <see cref="Quantifier.Any"/> requires at least one member to pass; <see cref="Quantifier.None"/> requires every member to fail.</param>
+    /// <param name="quantifierSpec">Override for the aggregate diagnostic emitted when <paramref name="quantifier"/> is <see cref="Quantifier.Any"/> or <see cref="Quantifier.None"/>. Ignored for <see cref="Quantifier.All"/>.</param>
+    public TypeShape Members(
+        SymbolKind? kind = null,
+        Action<FocusShape<MemberFocus>>? configure = null,
+        int min = 0,
+        int? max = null,
+        DiagnosticSpec? presenceSpec = null,
+        Quantifier quantifier = Quantifier.All,
+        DiagnosticSpec? quantifierSpec = null)
+    {
+        if (min < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(min), "Minimum count must be non-negative.");
+        }
+
+        if (max is { } m && m < min)
+        {
+            throw new ArgumentOutOfRangeException(nameof(max), "Maximum count must be at least the minimum.");
+        }
+
+        var nested = new FocusShape<MemberFocus>();
+        configure?.Invoke(nested);
+        var lens = Lenses.BuiltinLenses.Members(kind);
+
+        LensPresenceSpec? presence = null;
+        var hasPresence = min > 0 || max is not null || presenceSpec is not null;
+        var kindDescription = kind?.ToString() ?? "any kind";
+        if (hasPresence)
+        {
+            presence = new LensPresenceSpec(
+                Id: InternPool.Intern(presenceSpec?.Id ?? "SCRIBE051"),
+                Title: presenceSpec?.Title ?? "Member presence constraint",
+                MessageFormat: presenceSpec?.Message
+                    ?? "Expected [{0}..{1}] members of " + kindDescription + ", observed {2}",
+                Severity: presenceSpec?.Severity ?? DiagnosticSeverity.Error);
+        }
+
+        var quantifierDescriptor = BuildQuantifierSpec(
+            quantifier,
+            quantifierSpec,
+            defaultId: quantifier == Quantifier.Any ? "SCRIBE090" : "SCRIBE091",
+            defaultMessage: quantifier == Quantifier.Any
+                ? "At least one member of " + kindDescription + " must satisfy the required checks"
+                : "No member of " + kindDescription + " may satisfy the disallowed checks");
+
+        _lensBranches.Add(new LensBranch<TypeFocus, MemberFocus>(
+            Lens: lens,
+            Nested: nested,
+            MinCount: min,
+            MaxCount: max,
+            Presence: presence,
+            ParentOrigin: parent => parent.Origin,
+            Quantifier: quantifier,
+            QuantifierSpec: quantifierDescriptor,
+            HopDescription: kind is null ? "Members" : "Members(" + kindDescription + ")"));
+
+        return this;
+    }
+
+    /// <summary>
+    ///     Enter the base-type-chain lens: navigate the matched type's inheritance
+    ///     chain from immediate base up to (but excluding) <see cref="object"/>.
+    ///     Each step carries its depth — <c>0</c> = immediate base, <c>1</c> =
+    ///     grandparent, and so on. Declares a presence constraint when
+    ///     <paramref name="min"/> / <paramref name="max"/> are supplied;
+    ///     <c>min: 1</c> means "must inherit from a non-<see cref="object"/> base",
+    ///     <c>max: 0</c> means "must inherit directly from <see cref="object"/>".
+    /// </summary>
+    /// <param name="configure">Optional callback receiving the nested <see cref="FocusShape{BaseTypeChainFocus}"/> for per-step checks.</param>
+    /// <param name="min">Minimum chain length required.</param>
+    /// <param name="max">Maximum chain length allowed. <see langword="null"/> disables the upper bound.</param>
+    /// <param name="presenceSpec">Override for the presence-violation diagnostic descriptor.</param>
+    /// <param name="quantifier">How nested-check results aggregate across base-type-chain steps — <see cref="Quantifier.All"/> (default) emits per-child violations; <see cref="Quantifier.Any"/> requires at least one step to pass; <see cref="Quantifier.None"/> requires every step to fail.</param>
+    /// <param name="quantifierSpec">Override for the aggregate diagnostic emitted when <paramref name="quantifier"/> is <see cref="Quantifier.Any"/> or <see cref="Quantifier.None"/>. Ignored for <see cref="Quantifier.All"/>.</param>
+    public TypeShape BaseTypeChain(
+        Action<FocusShape<BaseTypeChainFocus>>? configure = null,
+        int min = 0,
+        int? max = null,
+        DiagnosticSpec? presenceSpec = null,
+        Quantifier quantifier = Quantifier.All,
+        DiagnosticSpec? quantifierSpec = null)
+    {
+        if (min < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(min), "Minimum count must be non-negative.");
+        }
+
+        if (max is { } m && m < min)
+        {
+            throw new ArgumentOutOfRangeException(nameof(max), "Maximum count must be at least the minimum.");
+        }
+
+        var nested = new FocusShape<BaseTypeChainFocus>();
+        configure?.Invoke(nested);
+        var lens = Lenses.BuiltinLenses.BaseTypeChain();
+
+        LensPresenceSpec? presence = null;
+        var hasPresence = min > 0 || max is not null || presenceSpec is not null;
+        if (hasPresence)
+        {
+            presence = new LensPresenceSpec(
+                Id: InternPool.Intern(presenceSpec?.Id ?? "SCRIBE052"),
+                Title: presenceSpec?.Title ?? "Base-type-chain length constraint",
+                MessageFormat: presenceSpec?.Message
+                    ?? "Expected [{0}..{1}] base-type-chain steps, observed {2}",
+                Severity: presenceSpec?.Severity ?? DiagnosticSeverity.Error);
+        }
+
+        var quantifierDescriptor = BuildQuantifierSpec(
+            quantifier,
+            quantifierSpec,
+            defaultId: quantifier == Quantifier.Any ? "SCRIBE094" : "SCRIBE095",
+            defaultMessage: quantifier == Quantifier.Any
+                ? "At least one base-type-chain step must satisfy the required checks"
+                : "No base-type-chain step may satisfy the disallowed checks");
+
+        _lensBranches.Add(new LensBranch<TypeFocus, BaseTypeChainFocus>(
+            Lens: lens,
+            Nested: nested,
+            MinCount: min,
+            MaxCount: max,
+            Presence: presence,
+            ParentOrigin: parent => parent.Origin,
+            Quantifier: quantifier,
+            QuantifierSpec: quantifierDescriptor,
+            HopDescription: "BaseTypeChain"));
+
+        return this;
     }
 
     /// <summary>
@@ -75,7 +359,7 @@ public sealed partial class ShapeBuilder
     ///     fast-path equivalent to <c>ForAttributeWithMetadataName</c> exists for
     ///     interface implementation.
     /// </remarks>
-    public ShapeBuilder Implementing(string metadataName)
+    public TypeShape Implementing(string metadataName)
     {
         if (string.IsNullOrEmpty(metadataName))
         {
@@ -91,7 +375,7 @@ public sealed partial class ShapeBuilder
     ///     interface's closed form is known at shape-declaration time; for open
     ///     generics (e.g. <c>IFoo&lt;&gt;</c>), supply the metadata name directly.
     /// </summary>
-    public ShapeBuilder Implementing<T>()
+    public TypeShape Implementing<T>()
         where T : class
         => Implementing(typeof(T).FullName!);
 
@@ -144,9 +428,9 @@ public sealed partial class ShapeBuilder
             Severity: spec?.Severity ?? defaultSeverity,
             SquiggleAt: spec?.Target ?? defaultSquiggle,
             FixKind: spec?.Fix?.Kind ?? defaultFix,
-            Predicate: predicate,
-            MessageArgs: messageArgs,
-            FixProperties: fixProperties));
+            Predicate: (focus, comp, ct) => predicate(focus.Symbol, comp, ct),
+            MessageArgs: focus => messageArgs(focus.Symbol),
+            FixProperties: fixProperties is null ? null : focus => fixProperties(focus.Symbol)));
     }
 
     // ───────────────────────────────────────────────────────────────
@@ -154,7 +438,7 @@ public sealed partial class ShapeBuilder
     // ───────────────────────────────────────────────────────────────
 
     /// <summary>Require the type to be declared <c>partial</c>.</summary>
-    public ShapeBuilder MustBePartial(DiagnosticSpec? spec = null)
+    public TypeShape MustBePartial(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE001",
@@ -170,7 +454,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Require the type to be declared <c>sealed</c>.</summary>
-    public ShapeBuilder MustBeSealed(DiagnosticSpec? spec = null)
+    public TypeShape MustBeSealed(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE005",
@@ -190,7 +474,7 @@ public sealed partial class ShapeBuilder
     ///     only in v1 — use the <see cref="MustImplement(string, DiagnosticSpec?)"/> overload
     ///     with a metadata name for generic interfaces.
     /// </summary>
-    public ShapeBuilder MustImplement<T>(DiagnosticSpec? spec = null)
+    public TypeShape MustImplement<T>(DiagnosticSpec? spec = null)
         where T : class
     {
         var fqn = typeof(T).FullName!;
@@ -198,7 +482,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Require the type to implement the interface named by <paramref name="metadataName"/>.</summary>
-    public ShapeBuilder MustImplement(string metadataName, DiagnosticSpec? spec = null)
+    public TypeShape MustImplement(string metadataName, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(metadataName))
         {
@@ -227,14 +511,14 @@ public sealed partial class ShapeBuilder
     ///     attribute and routes collection through
     ///     <see cref="SyntaxValueProvider.ForAttributeWithMetadataName{T}"/>.
     /// </summary>
-    public ShapeBuilder MustHaveAttribute<T>(DiagnosticSpec? spec = null)
+    public TypeShape MustHaveAttribute<T>(DiagnosticSpec? spec = null)
         where T : System.Attribute
         => MustHaveAttribute(typeof(T).FullName!, spec);
 
     /// <summary>
     ///     Require the type to carry the attribute named by <paramref name="metadataName"/>.
     /// </summary>
-    public ShapeBuilder MustHaveAttribute(string metadataName, DiagnosticSpec? spec = null)
+    public TypeShape MustHaveAttribute(string metadataName, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(metadataName))
         {
@@ -265,7 +549,7 @@ public sealed partial class ShapeBuilder
     ///     does not uniquely identify a target name; override via
     ///     <see cref="DiagnosticSpec"/> with a concrete <see cref="FixSpec"/> to supply one.
     /// </summary>
-    public ShapeBuilder MustBeNamed(string pattern, DiagnosticSpec? spec = null)
+    public TypeShape MustBeNamed(string pattern, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(pattern))
         {
@@ -287,7 +571,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Require the type to be declared <c>abstract</c>.</summary>
-    public ShapeBuilder MustBeAbstract(DiagnosticSpec? spec = null)
+    public TypeShape MustBeAbstract(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE015",
@@ -303,7 +587,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Require the type to be declared <c>static</c>.</summary>
-    public ShapeBuilder MustBeStatic(DiagnosticSpec? spec = null)
+    public TypeShape MustBeStatic(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE017",
@@ -322,14 +606,14 @@ public sealed partial class ShapeBuilder
     ///     Require the type to extend the base class <typeparamref name="T"/>.
     ///     Interfaces use <see cref="MustImplement{T}(DiagnosticSpec?)"/> instead.
     /// </summary>
-    public ShapeBuilder MustExtend<T>(DiagnosticSpec? spec = null)
+    public TypeShape MustExtend<T>(DiagnosticSpec? spec = null)
         where T : class
         => MustExtend(typeof(T).FullName!, spec);
 
     /// <summary>
     ///     Require the type to extend the base class named by <paramref name="metadataName"/>.
     /// </summary>
-    public ShapeBuilder MustExtend(string metadataName, DiagnosticSpec? spec = null)
+    public TypeShape MustExtend(string metadataName, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(metadataName))
         {
@@ -357,7 +641,7 @@ public sealed partial class ShapeBuilder
     ///     as a regular expression. No auto-fix is offered — moving a file is outside
     ///     Scribe's automation surface.
     /// </summary>
-    public ShapeBuilder MustBeInNamespace(string pattern, DiagnosticSpec? spec = null)
+    public TypeShape MustBeInNamespace(string pattern, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(pattern))
         {
@@ -382,7 +666,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the <c>abstract</c> modifier on the type.</summary>
-    public ShapeBuilder MustNotBeAbstract(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeAbstract(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE016",
@@ -398,7 +682,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid generic type parameters on the type.</summary>
-    public ShapeBuilder MustNotBeGeneric(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeGeneric(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE024",
@@ -414,14 +698,14 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid implementation of interface <typeparamref name="T"/>.</summary>
-    public ShapeBuilder MustNotImplement<T>(DiagnosticSpec? spec = null)
+    public TypeShape MustNotImplement<T>(DiagnosticSpec? spec = null)
         where T : class
         => MustNotImplement(typeof(T).FullName!, spec);
 
     /// <summary>
     ///     Forbid implementation of the interface named by <paramref name="metadataName"/>.
     /// </summary>
-    public ShapeBuilder MustNotImplement(string metadataName, DiagnosticSpec? spec = null)
+    public TypeShape MustNotImplement(string metadataName, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(metadataName))
         {
@@ -449,7 +733,7 @@ public sealed partial class ShapeBuilder
     // ───────────────────────────────────────────────────────────────
 
     /// <summary>Forbid the <c>partial</c> modifier on the type.</summary>
-    public ShapeBuilder MustNotBePartial(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBePartial(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE002",
@@ -465,7 +749,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the <c>sealed</c> modifier on the type.</summary>
-    public ShapeBuilder MustNotBeSealed(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeSealed(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE006",
@@ -483,12 +767,12 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid attribute <typeparamref name="T"/> on the type.</summary>
-    public ShapeBuilder MustNotHaveAttribute<T>(DiagnosticSpec? spec = null)
+    public TypeShape MustNotHaveAttribute<T>(DiagnosticSpec? spec = null)
         where T : System.Attribute
         => MustNotHaveAttribute(typeof(T).FullName!, spec);
 
     /// <summary>Forbid the attribute named by <paramref name="metadataName"/>.</summary>
-    public ShapeBuilder MustNotHaveAttribute(string metadataName, DiagnosticSpec? spec = null)
+    public TypeShape MustNotHaveAttribute(string metadataName, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(metadataName))
         {
@@ -515,7 +799,7 @@ public sealed partial class ShapeBuilder
     ///     Forbid the type's <see cref="ISymbol.Name"/> from matching <paramref name="pattern"/>.
     ///     No auto-fix — renaming is a cross-file operation outside Scribe's automation surface.
     /// </summary>
-    public ShapeBuilder MustNotBeNamed(string pattern, DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeNamed(string pattern, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(pattern))
         {
@@ -537,7 +821,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the <c>static</c> modifier on the type.</summary>
-    public ShapeBuilder MustNotBeStatic(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeStatic(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE018",
@@ -553,12 +837,12 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the type from extending <typeparamref name="T"/>.</summary>
-    public ShapeBuilder MustNotExtend<T>(DiagnosticSpec? spec = null)
+    public TypeShape MustNotExtend<T>(DiagnosticSpec? spec = null)
         where T : class
         => MustNotExtend(typeof(T).FullName!, spec);
 
     /// <summary>Forbid the type from extending the base class named by <paramref name="metadataName"/>.</summary>
-    public ShapeBuilder MustNotExtend(string metadataName, DiagnosticSpec? spec = null)
+    public TypeShape MustNotExtend(string metadataName, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(metadataName))
         {
@@ -585,7 +869,7 @@ public sealed partial class ShapeBuilder
     ///     Forbid the type's containing namespace from matching <paramref name="pattern"/>.
     ///     No auto-fix — moving a file is outside Scribe's automation surface.
     /// </summary>
-    public ShapeBuilder MustNotBeInNamespace(string pattern, DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeInNamespace(string pattern, DiagnosticSpec? spec = null)
     {
         if (string.IsNullOrEmpty(pattern))
         {
@@ -610,7 +894,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Require the type to declare at least one generic type parameter.</summary>
-    public ShapeBuilder MustBeGeneric(DiagnosticSpec? spec = null)
+    public TypeShape MustBeGeneric(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE023",
@@ -630,7 +914,7 @@ public sealed partial class ShapeBuilder
     // ───────────────────────────────────────────────────────────────
 
     /// <summary>Require the type to be declared <c>public</c>.</summary>
-    public ShapeBuilder MustBePublic(DiagnosticSpec? spec = null)
+    public TypeShape MustBePublic(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE011",
@@ -648,7 +932,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Require the type to be declared <c>internal</c>.</summary>
-    public ShapeBuilder MustBeInternal(DiagnosticSpec? spec = null)
+    public TypeShape MustBeInternal(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE013",
@@ -669,7 +953,7 @@ public sealed partial class ShapeBuilder
     ///     Require a nested type to be declared <c>private</c>. Top-level types cannot be
     ///     <c>private</c> — use <see cref="MustBeInternal"/> for that case.
     /// </summary>
-    public ShapeBuilder MustBePrivate(DiagnosticSpec? spec = null)
+    public TypeShape MustBePrivate(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE025",
@@ -687,7 +971,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the <c>public</c> visibility modifier on the type.</summary>
-    public ShapeBuilder MustNotBePublic(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBePublic(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE012",
@@ -703,7 +987,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the <c>internal</c> visibility modifier on the type.</summary>
-    public ShapeBuilder MustNotBeInternal(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeInternal(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE014",
@@ -719,7 +1003,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the <c>private</c> visibility modifier on the type.</summary>
-    public ShapeBuilder MustNotBePrivate(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBePrivate(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE026",
@@ -739,7 +1023,7 @@ public sealed partial class ShapeBuilder
     // ───────────────────────────────────────────────────────────────
 
     /// <summary>Require the type to be a <c>record</c> (class-record or record-struct).</summary>
-    public ShapeBuilder MustBeRecord(DiagnosticSpec? spec = null)
+    public TypeShape MustBeRecord(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE019",
@@ -755,7 +1039,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the <c>record</c> keyword on the type.</summary>
-    public ShapeBuilder MustNotBeRecord(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeRecord(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE020",
@@ -771,7 +1055,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Require the type to be a value type (<c>struct</c> or <c>record struct</c>).</summary>
-    public ShapeBuilder MustBeValueType(DiagnosticSpec? spec = null)
+    public TypeShape MustBeValueType(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE021",
@@ -792,7 +1076,7 @@ public sealed partial class ShapeBuilder
     ///     No auto-fix — rewriting to a record struct changes the type's identity and
     ///     semantics enough that the repair is left to the user.
     /// </summary>
-    public ShapeBuilder MustBeRecordStruct(DiagnosticSpec? spec = null)
+    public TypeShape MustBeRecordStruct(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE032",
@@ -813,7 +1097,7 @@ public sealed partial class ShapeBuilder
     ///     non-value-types pass this check. Pair with <see cref="MustBeValueType"/>
     ///     or a kind filter if you want a non-struct to also be rejected.
     /// </summary>
-    public ShapeBuilder MustBeReadOnly(DiagnosticSpec? spec = null)
+    public TypeShape MustBeReadOnly(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE033",
@@ -834,7 +1118,7 @@ public sealed partial class ShapeBuilder
     ///     consequences (accessibility, references, file layout) for Scribe to
     ///     automate.
     /// </summary>
-    public ShapeBuilder MustNotBeNested(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeNested(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE034",
@@ -850,7 +1134,7 @@ public sealed partial class ShapeBuilder
     }
 
     /// <summary>Forbid the type from being a value type.</summary>
-    public ShapeBuilder MustNotBeValueType(DiagnosticSpec? spec = null)
+    public TypeShape MustNotBeValueType(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE022",
@@ -875,7 +1159,7 @@ public sealed partial class ShapeBuilder
     ///     value types the default ctor is always present. Primary constructors on
     ///     records and structs are not considered parameterless.
     /// </summary>
-    public ShapeBuilder MustHaveParameterlessConstructor(DiagnosticSpec? spec = null)
+    public TypeShape MustHaveParameterlessConstructor(DiagnosticSpec? spec = null)
     {
         AddCheck(
             defaultId: "SCRIBE031",
@@ -894,7 +1178,7 @@ public sealed partial class ShapeBuilder
     //  Predicate helpers (static, closure-free)
     // ───────────────────────────────────────────────────────────────
 
-    private static bool IsPartial(INamedTypeSymbol symbol, CancellationToken ct)
+    internal static bool IsPartial(INamedTypeSymbol symbol, CancellationToken ct)
     {
         var refs = symbol.DeclaringSyntaxReferences;
         foreach (var reference in refs)
@@ -983,7 +1267,7 @@ public sealed partial class ShapeBuilder
         return false;
     }
 
-    private static bool HasAttribute(INamedTypeSymbol symbol, string metadataName)
+    internal static bool HasAttribute(INamedTypeSymbol symbol, string metadataName)
     {
         foreach (var attribute in symbol.GetAttributes())
         {
@@ -1033,7 +1317,7 @@ public sealed partial class ShapeBuilder
     ///     Additional message arguments beyond the type name (<c>{1}</c>, <c>{2}</c>, ...).
     ///     Optional — default yields just the type name as <c>{0}</c>.
     /// </param>
-    public ShapeBuilder Check(
+    public TypeShape Check(
         Func<INamedTypeSymbol, Compilation, CancellationToken, bool> predicate,
         string id,
         string title,
@@ -1069,8 +1353,8 @@ public sealed partial class ShapeBuilder
             Severity: severity,
             SquiggleAt: squiggle,
             FixKind: fix,
-            Predicate: predicate,
-            MessageArgs: args,
+            Predicate: (focus, comp, ct) => predicate(focus.Symbol, comp, ct),
+            MessageArgs: focus => args(focus.Symbol),
             FixProperties: fixProps is null ? null : _ => fixProps));
         return this;
     }
@@ -1096,7 +1380,7 @@ public sealed partial class ShapeBuilder
     /// <param name="match">Offender predicate — <see langword="true"/> reports a diagnostic.</param>
     /// <param name="spec">Diagnostic descriptor.</param>
     /// <param name="messageArgs">Message argument builder. <c>{0}</c> defaults to the type name; the user supplies any remaining args (typically the member name).</param>
-    public ShapeBuilder ForEachMember(
+    public TypeShape ForEachMember(
         Func<ISymbol, bool> match,
         MemberDiagnosticSpec spec,
         Func<INamedTypeSymbol, ISymbol, EquatableArray<string>>? messageArgs = null)

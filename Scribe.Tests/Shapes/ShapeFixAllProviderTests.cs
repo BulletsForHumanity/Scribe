@@ -29,10 +29,10 @@ public class ShapeFixAllProviderTests
     [Fact]
     public async Task FixAll_chains_partial_and_sealed_fixes_on_same_type()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePartial()
             .MustBeSealed()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await RunFixAll(shape, "public class Widget { }", FixAllScope.Document);
 
@@ -44,10 +44,10 @@ public class ShapeFixAllProviderTests
     [Fact]
     public async Task FixAll_chains_visibility_plus_remove_modifier_fixes()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePublic()
             .MustNotBeSealed()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await RunFixAll(shape, "internal sealed class Widget { }", FixAllScope.Document);
 
@@ -60,9 +60,9 @@ public class ShapeFixAllProviderTests
     [Fact]
     public async Task FixAll_applies_fixes_per_type_independently()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public class Widget { }
@@ -95,7 +95,7 @@ public class Gadget { }
 
         diagnostics.Length.ShouldBeGreaterThan(0);
 
-        var fixProvider = shape.ToFixProvider();
+        var fixProvider = shape.ToInk();
         var fixAll = fixProvider.GetFixAllProvider();
         fixAll.ShouldNotBeNull();
 

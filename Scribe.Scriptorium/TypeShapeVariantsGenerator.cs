@@ -9,7 +9,7 @@ namespace Scribe.Scriptorium;
 
 /// <summary>
 ///     Meta-generator. Runs at Scribe's own compile time. Scans
-///     <c>Scribe.Shapes.ShapeBuilder</c> for every <c>Must*</c> primitive and
+///     <c>Scribe.Shapes.TypeShape</c> for every <c>Must*</c> primitive and
 ///     emits severity variants into a partial class:
 ///     <list type="bullet">
 ///         <item><c>Must*</c> (positive)  →  <c>Should*</c> (Warning) + <c>Could*</c> (Info)</item>
@@ -19,9 +19,9 @@ namespace Scribe.Scriptorium;
 ///     only the severity when the caller has not supplied one.
 /// </summary>
 [Generator(LanguageNames.CSharp)]
-public sealed class ShapeBuilderVariantsGenerator : IIncrementalGenerator
+public sealed class TypeShapeVariantsGenerator : IIncrementalGenerator
 {
-    private const string ShapeBuilderMetadataName = "Scribe.Shapes.ShapeBuilder";
+    private const string TypeShapeMetadataName = "Scribe.Shapes.TypeShape";
     private const string DiagnosticSpecFqn = "Scribe.Shapes.DiagnosticSpec";
 
     // FullyQualifiedFormat minus UseSpecialTypes, so `System.String` doesn't collapse to the
@@ -42,14 +42,14 @@ public sealed class ShapeBuilderVariantsGenerator : IIncrementalGenerator
         {
             if (!string.IsNullOrEmpty(src))
             {
-                spc.AddSource("ShapeBuilder.Variants.g.cs", src!);
+                spc.AddSource("TypeShape.Variants.g.cs", src!);
             }
         });
     }
 
     private static string? BuildSource(Compilation compilation, CancellationToken ct)
     {
-        var shapeBuilder = compilation.GetTypeByMetadataName(ShapeBuilderMetadataName);
+        var shapeBuilder = compilation.GetTypeByMetadataName(TypeShapeMetadataName);
         if (shapeBuilder is null)
         {
             return null;
@@ -74,7 +74,7 @@ public sealed class ShapeBuilderVariantsGenerator : IIncrementalGenerator
         sb.AppendLine();
         sb.AppendLine("namespace Scribe.Shapes;");
         sb.AppendLine();
-        sb.AppendLine("partial class ShapeBuilder");
+        sb.AppendLine("partial class TypeShape");
         sb.AppendLine("{");
 
         var first = true;
@@ -108,7 +108,7 @@ public sealed class ShapeBuilderVariantsGenerator : IIncrementalGenerator
             return false;
         }
 
-        if (method.ReturnType.ToDisplayString() != ShapeBuilderMetadataName)
+        if (method.ReturnType.ToDisplayString() != TypeShapeMetadataName)
         {
             return false;
         }
@@ -164,7 +164,7 @@ public sealed class ShapeBuilderVariantsGenerator : IIncrementalGenerator
 
         sb.Append("    /// <summary>").Append(summary).AppendLine("</summary>");
 
-        sb.Append("    public global::Scribe.Shapes.ShapeBuilder ").Append(newName);
+        sb.Append("    public global::Scribe.Shapes.TypeShape ").Append(newName);
         AppendTypeParameters(sb, method);
         sb.Append('(');
         AppendParameterList(sb, method);
@@ -310,7 +310,7 @@ public sealed class ShapeBuilderVariantsGenerator : IIncrementalGenerator
     private static string FormatXmlRef(IMethodSymbol method)
     {
         var builder = new StringBuilder();
-        builder.Append("Scribe.Shapes.ShapeBuilder.").Append(method.Name);
+        builder.Append("Scribe.Shapes.TypeShape.").Append(method.Name);
         if (method.TypeParameters.Length > 0)
         {
             builder.Append('{');

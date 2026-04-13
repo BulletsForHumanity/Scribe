@@ -8,8 +8,8 @@ namespace Scribe.Ink.Shapes;
 ///     User-supplied fix handler for diagnostics emitted with
 ///     <see cref="Scribe.Shapes.FixKind.Custom"/>. Registered on a shape via
 ///     <see cref="ShapeInkExtensions.WithCustomFix{TModel}"/> under a
-///     <c>customFixTag</c> that the <see cref="Scribe.Shapes.ShapeBuilder.ForEachMember"/>
-///     or <see cref="Scribe.Shapes.ShapeBuilder.Check"/> declaration carried.
+///     <c>customFixTag</c> that the <see cref="Scribe.Shapes.TypeShape.ForEachMember"/>
+///     or <see cref="Scribe.Shapes.TypeShape.Check"/> declaration carried.
 /// </summary>
 /// <remarks>
 ///     <para>

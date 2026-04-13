@@ -8,13 +8,13 @@ using Scribe.Shapes;
 namespace Scribe.Tests.Shapes;
 
 /// <summary>
-///     Unit-tests the per-primitive predicate behaviour of <see cref="ShapeBuilder"/>.
+///     Unit-tests the per-primitive predicate behaviour of <see cref="TypeShape"/>.
 ///     Each test parses a compilation, picks out a named type, and invokes the
 ///     builder's internal check pipeline via <see cref="Shape{TModel}.ToProvider"/>
 ///     round-trips would be over-weight here — we probe the predicates directly
 ///     through a projected Shape on a synthetic dummy model.
 /// </summary>
-public class ShapeBuilderTests
+public class TypeShapeTests
 {
     private readonly record struct TypeNameModel(string Name);
 
@@ -42,20 +42,21 @@ public class ShapeBuilderTests
     private static INamedTypeSymbol GetType(string source, string metadataName) =>
         Compile(source, metadataName).Symbol;
 
-    private static EquatableArray<DiagnosticInfo> RunChecks(ShapeBuilder builder, string source, string metadataName)
+    private static EquatableArray<DiagnosticInfo> RunChecks(TypeShape builder, string source, string metadataName)
     {
         var (compilation, symbol) = Compile(source, metadataName);
         var ct = TestContext.Current.CancellationToken;
         var diags = new System.Collections.Generic.List<DiagnosticInfo>();
 
+        var focus = new TypeFocus(symbol, symbol.ToDisplayString(), origin: null);
         foreach (var check in builder.Checks)
         {
-            if (!check.Predicate(symbol, compilation, ct))
+            if (!check.Predicate(focus, compilation, ct))
             {
                 diags.Add(new DiagnosticInfo(
                     Id: check.Id,
                     Severity: check.Severity,
-                    MessageArgs: check.MessageArgs(symbol),
+                    MessageArgs: check.MessageArgs(focus),
                     Location: null));
             }
         }
@@ -64,7 +65,7 @@ public class ShapeBuilderTests
     }
 
     // Convenience overload for tests that already hold a compiled symbol.
-    private static EquatableArray<DiagnosticInfo> RunChecks(ShapeBuilder builder, INamedTypeSymbol symbol)
+    private static EquatableArray<DiagnosticInfo> RunChecks(TypeShape builder, INamedTypeSymbol symbol)
     {
         var ct = TestContext.Current.CancellationToken;
         var tree = symbol.DeclaringSyntaxReferences[0].SyntaxTree;
@@ -81,16 +82,17 @@ public class ShapeBuilderTests
                 MetadataReference.CreateFromFile(typeof(System.IDisposable).Assembly.Location),
             ]);
         var reResolved = compilation.GetTypeByMetadataName(symbol.ToDisplayString())!;
+        var focus = new TypeFocus(reResolved, reResolved.ToDisplayString(), origin: null);
 
         var diags = new System.Collections.Generic.List<DiagnosticInfo>();
         foreach (var check in builder.Checks)
         {
-            if (!check.Predicate(reResolved, compilation, ct))
+            if (!check.Predicate(focus, compilation, ct))
             {
                 diags.Add(new DiagnosticInfo(
                     Id: check.Id,
                     Severity: check.Severity,
-                    MessageArgs: check.MessageArgs(reResolved),
+                    MessageArgs: check.MessageArgs(focus),
                     Location: null));
             }
         }
@@ -106,7 +108,7 @@ public class ShapeBuilderTests
     public void MustBePartial_PassesForPartialClass()
     {
         var symbol = GetType("public partial class Foo {}", "Foo");
-        var builder = Shape.Class().MustBePartial();
+        var builder = Stencil.ExposeClass().MustBePartial();
         RunChecks(builder, symbol).IsEmpty.ShouldBeTrue();
     }
 
@@ -114,7 +116,7 @@ public class ShapeBuilderTests
     public void MustBePartial_FailsForNonPartialClass()
     {
         var symbol = GetType("public class Foo {}", "Foo");
-        var builder = Shape.Class().MustBePartial();
+        var builder = Stencil.ExposeClass().MustBePartial();
 
         var diags = RunChecks(builder, symbol);
         diags.Count.ShouldBe(1);
@@ -126,7 +128,7 @@ public class ShapeBuilderTests
     public void MustBePartial_UsesOverrideId()
     {
         var symbol = GetType("public class Foo {}", "Foo");
-        var builder = Shape.Class().MustBePartial(new DiagnosticSpec(Id: "CUSTOM01"));
+        var builder = Stencil.ExposeClass().MustBePartial(new DiagnosticSpec(Id: "CUSTOM01"));
 
         RunChecks(builder, symbol)[0].Id.ShouldBe("CUSTOM01");
     }
@@ -139,14 +141,14 @@ public class ShapeBuilderTests
     public void MustBeSealed_PassesForSealedClass()
     {
         var symbol = GetType("public sealed class Foo {}", "Foo");
-        RunChecks(Shape.Class().MustBeSealed(), symbol).IsEmpty.ShouldBeTrue();
+        RunChecks(Stencil.ExposeClass().MustBeSealed(), symbol).IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
     public void MustBeSealed_FailsForOpenClass()
     {
         var symbol = GetType("public class Foo {}", "Foo");
-        var diags = RunChecks(Shape.Class().MustBeSealed(), symbol);
+        var diags = RunChecks(Stencil.ExposeClass().MustBeSealed(), symbol);
 
         diags.Count.ShouldBe(1);
         diags[0].Id.ShouldBe("SCRIBE005");
@@ -156,7 +158,7 @@ public class ShapeBuilderTests
     public void MustBeSealed_PassesForValueType()
     {
         var symbol = GetType("public struct Foo {}", "Foo");
-        RunChecks(Shape.Struct().MustBeSealed(), symbol).IsEmpty.ShouldBeTrue();
+        RunChecks(Stencil.ExposeStruct().MustBeSealed(), symbol).IsEmpty.ShouldBeTrue();
     }
 
     // ───────────────────────────────────────────────────────────────
@@ -169,14 +171,14 @@ public class ShapeBuilderTests
         var symbol = GetType(
             "using System; public class Foo : IDisposable { public void Dispose() {} }",
             "Foo");
-        RunChecks(Shape.Class().MustImplement<System.IDisposable>(), symbol).IsEmpty.ShouldBeTrue();
+        RunChecks(Stencil.ExposeClass().MustImplement<System.IDisposable>(), symbol).IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
     public void MustImplement_FailsWhenInterfaceMissing()
     {
         var symbol = GetType("public class Foo {}", "Foo");
-        var diags = RunChecks(Shape.Class().MustImplement<System.IDisposable>(), symbol);
+        var diags = RunChecks(Stencil.ExposeClass().MustImplement<System.IDisposable>(), symbol);
 
         diags.Count.ShouldBe(1);
         diags[0].Id.ShouldBe("SCRIBE007");
@@ -188,7 +190,7 @@ public class ShapeBuilderTests
         var symbol = GetType(
             "using System; public class Foo : IDisposable { public void Dispose() {} }",
             "Foo");
-        RunChecks(Shape.Class().MustImplement("System.IDisposable"), symbol).IsEmpty.ShouldBeTrue();
+        RunChecks(Stencil.ExposeClass().MustImplement("System.IDisposable"), symbol).IsEmpty.ShouldBeTrue();
     }
 
     // ───────────────────────────────────────────────────────────────
@@ -204,14 +206,14 @@ public class ShapeBuilderTests
             [Foo] public class Target {}
             """, "Target");
 
-        RunChecks(Shape.Class().MustHaveAttribute("FooAttribute"), symbol).IsEmpty.ShouldBeTrue();
+        RunChecks(Stencil.ExposeClass().MustHaveAttribute("FooAttribute"), symbol).IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
     public void MustHaveAttribute_FailsWhenAttributeMissing()
     {
         var symbol = GetType("public class Target {}", "Target");
-        var diags = RunChecks(Shape.Class().MustHaveAttribute("FooAttribute"), symbol);
+        var diags = RunChecks(Stencil.ExposeClass().MustHaveAttribute("FooAttribute"), symbol);
 
         diags.Count.ShouldBe(1);
         diags[0].Id.ShouldBe("SCRIBE003");
@@ -220,14 +222,14 @@ public class ShapeBuilderTests
     [Fact]
     public void MustHaveAttribute_SetsPrimaryAttributeMetadataName()
     {
-        var builder = Shape.Class().MustHaveAttribute("FooAttribute");
+        var builder = Stencil.ExposeClass().MustHaveAttribute("FooAttribute");
         builder.PrimaryAttributeMetadataName.ShouldBe("FooAttribute");
     }
 
     [Fact]
     public void MustHaveAttribute_SecondCall_DoesNotOverridePrimary()
     {
-        var builder = Shape.Class()
+        var builder = Stencil.ExposeClass()
             .MustHaveAttribute("FirstAttribute")
             .MustHaveAttribute("SecondAttribute");
         builder.PrimaryAttributeMetadataName.ShouldBe("FirstAttribute");
@@ -242,14 +244,14 @@ public class ShapeBuilderTests
     public void MustBeNamed_PassesWhenMatches()
     {
         var symbol = GetType("public class FooHandler {}", "FooHandler");
-        RunChecks(Shape.Class().MustBeNamed(".*Handler$"), symbol).IsEmpty.ShouldBeTrue();
+        RunChecks(Stencil.ExposeClass().MustBeNamed(".*Handler$"), symbol).IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
     public void MustBeNamed_FailsWhenDoesNotMatch()
     {
         var symbol = GetType("public class FooManager {}", "FooManager");
-        var diags = RunChecks(Shape.Class().MustBeNamed(".*Handler$"), symbol);
+        var diags = RunChecks(Stencil.ExposeClass().MustBeNamed(".*Handler$"), symbol);
 
         diags.Count.ShouldBe(1);
         diags[0].Id.ShouldBe("SCRIBE029");
@@ -263,7 +265,7 @@ public class ShapeBuilderTests
     public void MultipleChecks_AllFail_YieldsAllDiagnostics()
     {
         var symbol = GetType("public class Foo {}", "Foo");
-        var builder = Shape.Class()
+        var builder = Stencil.ExposeClass()
             .MustBePartial()
             .MustBeSealed()
             .MustBeNamed(".*Handler$");
@@ -277,9 +279,9 @@ public class ShapeBuilderTests
     [Fact]
     public void ProjectSealsBuilder_IntoTypedShape()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<TypeNameModel>((in ShapeProjectionContext ctx) => new TypeNameModel(ctx.Symbol.Name));
+            .Etch<TypeNameModel>((in ShapeEtchContext ctx) => new TypeNameModel(ctx.Symbol.Name));
 
         shape.ShouldNotBeNull();
     }

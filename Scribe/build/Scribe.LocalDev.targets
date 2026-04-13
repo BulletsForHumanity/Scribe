@@ -79,7 +79,8 @@
                and '$(ScribesName)' != ''
                and '$(PackageId)' != ''
                and '$(ScribeArtifactsDir)' != ''
-               and '$(IsPackable)' != 'false'"
+               and '$(IsPackable)' != 'false'
+               and '$(_IsScribeMeta)' != 'true'"
   >
     <PropertyGroup>
       <_ScribeDevVersion>$(NuGetPackageVersion)</_ScribeDevVersion>

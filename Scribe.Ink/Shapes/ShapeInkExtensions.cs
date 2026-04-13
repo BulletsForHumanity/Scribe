@@ -19,7 +19,7 @@ public static class ShapeInkExtensions
     ///     instance in a concrete <c>[ExportCodeFixProvider]</c>-attributed class
     ///     that delegates its members for deployment.
     /// </summary>
-    public static CodeFixProvider ToFixProvider<TModel>(this Shape<TModel> shape)
+    public static CodeFixProvider ToInk<TModel>(this Shape<TModel> shape)
         where TModel : IEquatable<TModel>
     {
         if (shape is null)
@@ -46,7 +46,7 @@ public static class ShapeInkExtensions
     ///     Diagnostics whose <c>fixKind</c> is <see cref="FixKind.Custom"/> and whose
     ///     <c>customFixTag</c> property matches <paramref name="tag"/> will be routed
     ///     to <paramref name="fix"/> by the provider returned from
-    ///     <see cref="ToFixProvider{TModel}"/>.
+    ///     <see cref="ToInk{TModel}"/>.
     /// </summary>
     public static Shape<TModel> WithCustomFix<TModel>(
         this Shape<TModel> shape, string tag, IShapeCustomFix fix)

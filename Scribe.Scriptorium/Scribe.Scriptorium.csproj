@@ -1,13 +1,13 @@
 <!--
     Scriptorium is a build-time-only source generator (Meta type) that runs during
     Scribe's own compile to emit Should*/Could*/ShouldNot* variants of each Must*
-    primitive on ShapeBuilder. Never shipped to consumers.
+    primitive on TypeShape. Never shipped to consumers.
 -->
 <Project Sdk="BulletsForHumanity.Scribe.Sdk">
   <PropertyGroup>
     <ScribeSdkProjectType>Meta</ScribeSdkProjectType>
     <PackageId>BulletsForHumanity.Scribe.Scriptorium</PackageId>
-    <Description>Build-time-only meta-generator that emits Should*/Could*/ShouldNot* variants of each Must* primitive on Scribe's ShapeBuilder. Consumed solution-internally by Scribe via local -dev PackageReference for VS analyzer hot-refresh.</Description>
+    <Description>Build-time-only meta-generator that emits Should*/Could*/ShouldNot* variants of each Must* primitive on Scribe's TypeShape. Consumed solution-internally by Scribe via local -dev PackageReference for VS analyzer hot-refresh.</Description>
   </PropertyGroup>
 
   <ItemGroup>

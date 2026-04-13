@@ -2,7 +2,7 @@ namespace Scribe.Shapes;
 
 /// <summary>
 ///     A declarative hint — picked up by Phase-4 code-fix generation — describing
-///     how a violation of a <see cref="ShapeBuilder"/> check should be auto-repaired.
+///     how a violation of a <see cref="TypeShape"/> check should be auto-repaired.
 /// </summary>
 public readonly record struct FixSpec(FixKind Kind, string? EquivalenceKey = null);
 
@@ -73,7 +73,7 @@ public enum FixKind
 
     /// <summary>
     ///     User-supplied fix. The diagnostic carries a <c>customFixTag</c> property
-    ///     that <see cref="ShapeBuilder"/> consumers register a handler for via the
+    ///     that <see cref="TypeShape"/> consumers register a handler for via the
     ///     Ink extension <c>WithCustomFix</c>. The fix provider looks up the tag
     ///     and dispatches to the user delegate instead of the built-in
     ///     <see cref="FixKind"/> catalog.

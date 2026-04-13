@@ -7,9 +7,9 @@ namespace Scribe.Ink.Shapes;
 
 /// <summary>
 ///     SCRIBE200 — forbid Roslyn reference types on any TModel passed to
-///     <c>Shape&lt;TModel&gt;.Project&lt;TModel&gt;</c>. Holding an <c>ISymbol</c>,
+///     <c>TypeShape.Etch&lt;TModel&gt;</c>. Holding an <c>ISymbol</c>,
 ///     <c>SyntaxNode</c>, <c>Compilation</c>, <c>SemanticModel</c>, <c>SyntaxTree</c>,
-///     <c>Location</c>, or <c>AttributeData</c> in a cached model defeats the
+///     <c>Location</c>, or <c>AttributeData</c> in an etched model defeats the
 ///     incremental generator cache: those objects identity-compare per compilation.
 ///     Extract the primitive data you need into strings, equatable arrays, or
 ///     <see cref="Scribe.Cache.LocationInfo"/> instead.
@@ -21,8 +21,8 @@ public sealed class CacheCorrectnessAnalyzer : DiagnosticAnalyzer
 
     private static readonly DiagnosticDescriptor Descriptor = new(
         id: DiagnosticId,
-        title: "Cache-hostile type in Shape projection model",
-        messageFormat: "Member '{0}' of type '{1}' is a Roslyn reference type ('{2}') — storing it in a Shape projection model defeats incremental caching. Extract primitives or use LocationInfo instead.",
+        title: "Cache-hostile type in etched Shape model",
+        messageFormat: "Member '{0}' of type '{1}' is a Roslyn reference type ('{2}') — storing it in an etched Shape model defeats incremental caching. Extract primitives or use LocationInfo instead.",
         category: "Scribe.Cache",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
@@ -39,8 +39,8 @@ public sealed class CacheCorrectnessAnalyzer : DiagnosticAnalyzer
 
     private static void OnCompilationStart(CompilationStartAnalysisContext context)
     {
-        var shapeBuilder = context.Compilation.GetTypeByMetadataName("Scribe.Shapes.ShapeBuilder");
-        if (shapeBuilder is null)
+        var typeShape = context.Compilation.GetTypeByMetadataName("Scribe.Shapes.TypeShape");
+        if (typeShape is null)
         {
             return;
         }
@@ -52,7 +52,7 @@ public sealed class CacheCorrectnessAnalyzer : DiagnosticAnalyzer
         }
 
         context.RegisterOperationAction(
-            ctx => AnalyzeInvocation(ctx, shapeBuilder, forbidden),
+            ctx => AnalyzeInvocation(ctx, typeShape, forbidden),
             OperationKind.Invocation);
     }
 
@@ -81,7 +81,7 @@ public sealed class CacheCorrectnessAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeInvocation(
         OperationAnalysisContext context,
-        INamedTypeSymbol shapeBuilder,
+        INamedTypeSymbol typeShape,
         ImmutableArray<INamedTypeSymbol> forbidden)
     {
         if (context.Operation is not IInvocationOperation invocation)
@@ -90,9 +90,9 @@ public sealed class CacheCorrectnessAnalyzer : DiagnosticAnalyzer
         }
 
         var method = invocation.TargetMethod;
-        if (method.Name != "Project"
+        if (method.Name != "Etch"
             || method.TypeArguments.Length != 1
-            || !SymbolEqualityComparer.Default.Equals(method.OriginalDefinition.ContainingType, shapeBuilder))
+            || !SymbolEqualityComparer.Default.Equals(method.OriginalDefinition.ContainingType, typeShape))
         {
             return;
         }

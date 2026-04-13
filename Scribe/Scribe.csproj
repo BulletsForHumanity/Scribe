@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <!-- Scriptorium: build-time-only meta-generator. Emits Should*/Could*/ShouldNot*
-       variants of each Must* primitive on ShapeBuilder. In Debug, consumed via
+       variants of each Must* primitive on TypeShape. In Debug, consumed via
        the -dev.* NuGet package (VS analyzer hot-reload); in Release, via a
        plain ProjectReference-Analyzer for CI-safe builds. -->
   <ItemGroup>

@@ -5,6 +5,6 @@
     "allowPrerelease": false
   },
   "msbuild-sdks": {
-    "BulletsForHumanity.Scribe.Sdk": "0.6.1"
+    "BulletsForHumanity.Scribe.Sdk": "0.6.2-dev.20260413-140444-648"
   }
 }

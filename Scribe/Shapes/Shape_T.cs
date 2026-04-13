@@ -8,20 +8,23 @@ using Scribe.Cache;
 namespace Scribe.Shapes;
 
 /// <summary>
-///     A sealed shape typed with its projection <typeparamref name="TModel"/>. Produced
-///     by <see cref="ShapeBuilder.Project{TModel}"/>. In Phase 3 only
-///     <see cref="ToProvider"/> is exposed; <c>ToAnalyzer</c> and <c>ToFixProvider</c>
-///     ship in Phase 4.
+///     A sealed, etched Shape typed with its model <typeparamref name="TModel"/>. Produced
+///     by <see cref="TypeShape.Etch{TModel}"/>. Materialises into an analyzer, a generator
+///     provider, or a code-fixer via <see cref="ToProvider"/> / <c>ToAnalyzer</c> /
+///     <c>ToInk</c>.
 /// </summary>
-/// <typeparam name="TModel">User projection type. Must be <see cref="IEquatable{T}"/> for cache correctness.</typeparam>
+/// <typeparam name="TModel">User model type. Must be <see cref="IEquatable{T}"/> for cache correctness.</typeparam>
 public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
 {
     private readonly TypeKindFilter _kind;
     private readonly ShapeCheck[] _checks;
     private readonly MemberCheck[] _memberChecks;
+    private readonly ILensBranch<TypeFocus>[] _lensBranches;
     private readonly string? _primaryAttributeMetadataName;
     private readonly string? _primaryInterfaceMetadataName;
-    private readonly ProjectionDelegate<TModel> _project;
+    private readonly EtchDelegate<TModel> _etch;
+    private readonly OneOfBranch[]? _alternatives;
+    private readonly LensQuantifierSpec? _fusionSpec;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _customFixes =
         new(StringComparer.Ordinal);
 
@@ -29,17 +32,43 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
         TypeKindFilter kind,
         ShapeCheck[] checks,
         MemberCheck[] memberChecks,
+        ILensBranch<TypeFocus>[] lensBranches,
         string? primaryAttributeMetadataName,
         string? primaryInterfaceMetadataName,
-        ProjectionDelegate<TModel> project)
+        EtchDelegate<TModel> etch)
     {
         _kind = kind;
         _checks = checks;
         _memberChecks = memberChecks;
+        _lensBranches = lensBranches;
         _primaryAttributeMetadataName = primaryAttributeMetadataName;
         _primaryInterfaceMetadataName = primaryInterfaceMetadataName;
-        _project = project;
+        _etch = etch;
+        _alternatives = null;
+        _fusionSpec = null;
     }
+
+    internal Shape(
+        OneOfBranch[] alternatives,
+        string? primaryAttributeMetadataName,
+        string? primaryInterfaceMetadataName,
+        LensQuantifierSpec fusionSpec,
+        EtchDelegate<TModel> etch)
+    {
+        _kind = TypeKindFilter.Any;
+        _checks = Array.Empty<ShapeCheck>();
+        _memberChecks = Array.Empty<MemberCheck>();
+        _lensBranches = Array.Empty<ILensBranch<TypeFocus>>();
+        _primaryAttributeMetadataName = primaryAttributeMetadataName;
+        _primaryInterfaceMetadataName = primaryInterfaceMetadataName;
+        _etch = etch;
+        _alternatives = alternatives ?? throw new ArgumentNullException(nameof(alternatives));
+        _fusionSpec = fusionSpec ?? throw new ArgumentNullException(nameof(fusionSpec));
+    }
+
+    internal bool IsOneOf => _alternatives is not null;
+    internal OneOfBranch[]? Alternatives => _alternatives;
+    internal LensQuantifierSpec? FusionSpec => _fusionSpec;
 
     /// <summary>
     ///     Register a custom fix handler under <paramref name="tag"/>. The handler's
@@ -120,16 +149,49 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
 
     private bool MatchesNodeKind(SyntaxNode node)
     {
-        // Delegate to the builder's kind matcher by reconstructing a lightweight check.
-        return _kind switch
+        if (_alternatives is not null)
         {
-            TypeKindFilter.Any => node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax,
-            _ => KindMatcher.Matches(_kind, node),
-        };
+            foreach (var alt in _alternatives)
+            {
+                if (MatchesNodeKindSingle(alt.Kind, node))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return MatchesNodeKindSingle(_kind, node);
     }
 
-    private bool MatchesSymbolKind(INamedTypeSymbol symbol) =>
-        _kind switch
+    private static bool MatchesNodeKindSingle(TypeKindFilter kind, SyntaxNode node) =>
+        kind switch
+        {
+            TypeKindFilter.Any => node is Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax,
+            _ => KindMatcher.Matches(kind, node),
+        };
+
+    private bool MatchesSymbolKind(INamedTypeSymbol symbol)
+    {
+        if (_alternatives is not null)
+        {
+            foreach (var alt in _alternatives)
+            {
+                if (MatchesSymbolKindSingle(alt.Kind, symbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return MatchesSymbolKindSingle(_kind, symbol);
+    }
+
+    internal static bool MatchesSymbolKindSingle(TypeKindFilter kind, INamedTypeSymbol symbol) =>
+        kind switch
         {
             TypeKindFilter.Class => symbol.TypeKind == TypeKind.Class && !symbol.IsRecord,
             TypeKindFilter.Record => symbol.TypeKind == TypeKind.Class && symbol.IsRecord,
@@ -162,9 +224,9 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
             ? AttributeSchema.For(symbol, _primaryAttributeMetadataName)
             : default;
 
-        var projectionContext = new ShapeProjectionContext(
+        var etchContext = new ShapeEtchContext(
             symbol, attributeReader, semanticModel, compilation, ct);
-        var model = _project(in projectionContext);
+        var model = _etch(in etchContext);
 
         var location = LocationInfo.From(FirstLocation(symbol));
 
@@ -178,16 +240,30 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
     private EquatableArray<DiagnosticInfo> RunChecks(
         INamedTypeSymbol symbol, Compilation compilation, CancellationToken ct)
     {
-        if (_checks.Length == 0 && _memberChecks.Length == 0)
+        if (_alternatives is not null)
+        {
+            return RunOneOfChecks(symbol, compilation, ct);
+        }
+
+        if (_checks.Length == 0 && _memberChecks.Length == 0 && _lensBranches.Length == 0)
         {
             return EquatableArray<DiagnosticInfo>.Empty;
         }
 
         List<DiagnosticInfo>? violations = null;
+        TypeFocus? typeFocus = null;
+        if (_checks.Length > 0 || _lensBranches.Length > 0)
+        {
+            typeFocus = new TypeFocus(
+                symbol: symbol,
+                fqn: InternPool.Intern(symbol.ToDisplayString()),
+                origin: LocationInfo.From(FirstLocation(symbol)));
+        }
+
         foreach (var check in _checks)
         {
             ct.ThrowIfCancellationRequested();
-            if (check.Predicate(symbol, compilation, ct))
+            if (check.Predicate(typeFocus!.Value, compilation, ct))
             {
                 continue;
             }
@@ -196,7 +272,7 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
             violations.Add(new DiagnosticInfo(
                 Id: check.Id,
                 Severity: check.Severity,
-                MessageArgs: check.MessageArgs(symbol),
+                MessageArgs: check.MessageArgs(typeFocus!.Value),
                 Location: LocationInfo.From(FirstLocation(symbol))));
         }
 
@@ -222,9 +298,121 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
             }
         }
 
+        if (_lensBranches.Length > 0)
+        {
+            foreach (var branch in _lensBranches)
+            {
+                violations ??= new List<DiagnosticInfo>();
+                branch.Evaluate(typeFocus!.Value, compilation, ct, violations);
+            }
+        }
+
         return violations is null
             ? EquatableArray<DiagnosticInfo>.Empty
             : EquatableArray.From<DiagnosticInfo>(violations);
+    }
+
+    private EquatableArray<DiagnosticInfo> RunOneOfChecks(
+        INamedTypeSymbol symbol, Compilation compilation, CancellationToken ct)
+    {
+        var alternatives = _alternatives!;
+        var typeFocus = new TypeFocus(
+            symbol: symbol,
+            fqn: InternPool.Intern(symbol.ToDisplayString()),
+            origin: LocationInfo.From(FirstLocation(symbol)));
+
+        var perBranchViolations = new List<DiagnosticInfo>[alternatives.Length];
+
+        for (var i = 0; i < alternatives.Length; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var alt = alternatives[i];
+            var scratch = new List<DiagnosticInfo>();
+
+            if (!MatchesSymbolKindSingle(alt.Kind, symbol))
+            {
+                // Kind mismatch is itself a branch failure; synthesise a marker so fusion
+                // can surface the reason "this branch didn't match your symbol kind".
+                scratch.Add(new DiagnosticInfo(
+                    Id: "SCRIBE101",
+                    Severity: DiagnosticSeverity.Info,
+                    MessageArgs: EquatableArray.Create(alt.Kind.ToString()),
+                    Location: typeFocus.Origin));
+                perBranchViolations[i] = scratch;
+                continue;
+            }
+
+            foreach (var check in alt.Checks)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (check.Predicate(typeFocus, compilation, ct))
+                {
+                    continue;
+                }
+
+                scratch.Add(new DiagnosticInfo(
+                    Id: check.Id,
+                    Severity: check.Severity,
+                    MessageArgs: check.MessageArgs(typeFocus),
+                    Location: typeFocus.Origin));
+            }
+
+            foreach (var branch in alt.LensBranches)
+            {
+                branch.Evaluate(typeFocus, compilation, ct, scratch);
+            }
+
+            perBranchViolations[i] = scratch;
+        }
+
+        // Any branch with zero violations is a pass — overall silent.
+        for (var i = 0; i < perBranchViolations.Length; i++)
+        {
+            if (perBranchViolations[i].Count == 0)
+            {
+                return EquatableArray<DiagnosticInfo>.Empty;
+            }
+        }
+
+        var summary = FormatFusionSummary(perBranchViolations);
+        var fusion = new DiagnosticInfo(
+            Id: _fusionSpec!.Id,
+            Severity: _fusionSpec.Severity,
+            MessageArgs: EquatableArray.Create(
+                alternatives.Length.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                summary),
+            Location: typeFocus.Origin);
+
+        return EquatableArray.From<DiagnosticInfo>(new[] { fusion });
+    }
+
+    private static string FormatFusionSummary(List<DiagnosticInfo>[] perBranchViolations)
+    {
+        var builder = new System.Text.StringBuilder();
+        for (var i = 0; i < perBranchViolations.Length; i++)
+        {
+            if (i > 0)
+            {
+                builder.Append("  —OR—  ");
+            }
+
+            builder.Append('[');
+            builder.Append("branch").Append(i + 1).Append(": ");
+            var branch = perBranchViolations[i];
+            for (var j = 0; j < branch.Count; j++)
+            {
+                if (j > 0)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append(branch[j].Id);
+            }
+
+            builder.Append(']');
+        }
+
+        return builder.ToString();
     }
 
     internal static IEnumerable<ISymbol> EnumerateDeclaredMembers(INamedTypeSymbol type)

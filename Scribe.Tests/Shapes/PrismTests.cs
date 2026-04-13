@@ -11,39 +11,39 @@ using Xunit;
 namespace Scribe.Tests.Shapes;
 
 /// <summary>
-///     Drives <see cref="Relation.Pair{TLeft, TRight}"/> through
+///     Drives <see cref="Prism.By{TLeft, TRight}"/> through
 ///     <see cref="CSharpGeneratorDriver"/> and validates three flows:
-///     matched pairs stream, orphan-left diagnostic, orphan-right diagnostic.
-///     Grounding scenario is the Hermetic-style Command ↔ Event join: each command
+///     matched stream, orphan-left diagnostic, orphan-right diagnostic.
+///     Grounding scenario is a generic command ↔ event join: each command
 ///     declares the event metadata name it raises, each event declares its own name;
-///     the pair joins on that shared key.
+///     the prism joins on that shared key.
 /// </summary>
-public class RelationPairTests
+public class PrismTests
 {
     private readonly record struct Command(string Fqn, string RaisesEventName);
 
     private readonly record struct Event(string Fqn, string Name);
 
-    private sealed class PairGenerator : IIncrementalGenerator
+    private sealed class PrismGenerator : IIncrementalGenerator
     {
-        public static readonly List<ShapedPair<Command, Event>> Pairs = new();
+        public static readonly List<ShapedPrism<Command, Event>> Pairs = new();
         public static readonly List<Diagnostic> Diagnostics = new();
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            var commandShape = Shape.Class()
+            var commandShape = Stencil.ExposeClass()
                 .MustHaveAttribute("CommandAttribute")
-                .Project<Command>((in ShapeProjectionContext ctx) =>
+                .Etch<Command>((in ShapeEtchContext ctx) =>
                     new Command(
                         Fqn: ctx.Fqn,
                         RaisesEventName: ctx.Attribute.Ctor<string>(0) ?? string.Empty));
 
-            var eventShape = Shape.Class()
+            var eventShape = Stencil.ExposeClass()
                 .MustHaveAttribute("EventAttribute")
-                .Project<Event>((in ShapeProjectionContext ctx) =>
+                .Etch<Event>((in ShapeEtchContext ctx) =>
                     new Event(Fqn: ctx.Fqn, Name: ctx.Fqn));
 
-            var pair = Relation.Pair(
+            var prism = Prism.By(
                     commandShape.ToProvider(context),
                     eventShape.ToProvider(context),
                     leftKey: c => c.RaisesEventName,
@@ -57,12 +57,12 @@ public class RelationPairTests
                     title: "Event is declared but never raised",
                     messageFormat: "Event '{0}' is declared but never raised");
 
-            context.RegisterSourceOutput(pair.Matched, (spc, p) =>
+            context.RegisterSourceOutput(prism.Matched, (spc, p) =>
             {
                 lock (Pairs) { Pairs.Add(p); }
             });
 
-            pair.RegisterDiagnostics(context);
+            prism.RegisterDiagnostics(context);
         }
     }
 
@@ -77,13 +77,13 @@ public class RelationPairTests
             ],
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-    private static (Microsoft.CodeAnalysis.GeneratorDriverRunResult Result, List<ShapedPair<Command, Event>> Pairs) Run(string source)
+    private static (Microsoft.CodeAnalysis.GeneratorDriverRunResult Result, List<ShapedPrism<Command, Event>> Pairs) Run(string source)
     {
-        PairGenerator.Pairs.Clear();
-        PairGenerator.Diagnostics.Clear();
-        var driver = CSharpGeneratorDriver.Create(new PairGenerator())
+        PrismGenerator.Pairs.Clear();
+        PrismGenerator.Diagnostics.Clear();
+        var driver = CSharpGeneratorDriver.Create(new PrismGenerator())
             .RunGenerators(MakeCompilation(source), TestContext.Current.CancellationToken);
-        return (driver.GetRunResult(), [..PairGenerator.Pairs]);
+        return (driver.GetRunResult(), [..PrismGenerator.Pairs]);
     }
 
     [Fact]
@@ -161,19 +161,19 @@ public sealed class EventAttribute : Attribute {}
     {
         var silentGen = new InlineGen((context) =>
         {
-            var left = Shape.Class()
+            var left = Stencil.ExposeClass()
                 .MustHaveAttribute("CommandAttribute")
-                .Project<Command>((in ShapeProjectionContext ctx) =>
+                .Etch<Command>((in ShapeEtchContext ctx) =>
                     new Command(ctx.Fqn, ctx.Attribute.Ctor<string>(0) ?? string.Empty));
-            var right = Shape.Class()
+            var right = Stencil.ExposeClass()
                 .MustHaveAttribute("EventAttribute")
-                .Project<Event>((in ShapeProjectionContext ctx) => new Event(ctx.Fqn, ctx.Fqn));
+                .Etch<Event>((in ShapeEtchContext ctx) => new Event(ctx.Fqn, ctx.Fqn));
 
-            var pair = Relation.Pair(left.ToProvider(context), right.ToProvider(context),
+            var prism = Prism.By(left.ToProvider(context), right.ToProvider(context),
                 c => c.RaisesEventName, e => e.Name);
 
-            pair.RegisterDiagnostics(context);
-            context.RegisterSourceOutput(pair.Matched, (spc, _) => { });
+            prism.RegisterDiagnostics(context);
+            context.RegisterSourceOutput(prism.Matched, (spc, _) => { });
         });
 
         var driver = CSharpGeneratorDriver.Create(silentGen).RunGenerators(
