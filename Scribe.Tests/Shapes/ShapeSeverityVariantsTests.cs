@@ -26,9 +26,9 @@ public class ShapeSeverityVariantsTests
     [Fact]
     public void ShouldBePartial_reports_SCRIBE001_at_Warning_severity()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .ShouldBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
@@ -40,9 +40,9 @@ public class ShapeSeverityVariantsTests
     [Fact]
     public void CouldBePartial_reports_SCRIBE001_at_Info_severity()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .CouldBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
@@ -54,12 +54,12 @@ public class ShapeSeverityVariantsTests
     [Fact]
     public void MustBePartial_ShouldBePartial_and_CouldBePartial_all_share_SCRIBE001()
     {
-        var must = Shape.Class().MustBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
-        var should = Shape.Class().ShouldBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
-        var could = Shape.Class().CouldBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+        var must = Stencil.ExposeClass().MustBePartial()
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
+        var should = Stencil.ExposeClass().ShouldBePartial()
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
+        var could = Stencil.ExposeClass().CouldBePartial()
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         const string source = "public class Widget { }";
 
@@ -71,9 +71,9 @@ public class ShapeSeverityVariantsTests
     [Fact]
     public void Pragma_warning_disable_SCRIBE001_silences_the_ShouldBe_variant()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .ShouldBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         const string source = @"
 #pragma warning disable SCRIBE001
@@ -89,9 +89,9 @@ public class Widget { }
     public void Caller_supplied_severity_wins_over_variant_default()
     {
         // ShouldBePartial defaults to Warning, but the caller pins Hidden.
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .ShouldBePartial(new DiagnosticSpec(Severity: DiagnosticSeverity.Hidden))
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
@@ -104,9 +104,9 @@ public class Widget { }
     {
         // Exercises the Scriptorium-generated generic overload with its
         // `where T : class` constraint, plus severity demotion.
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .ShouldImplement<System.IDisposable>()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 

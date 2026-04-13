@@ -13,7 +13,7 @@ namespace Scribe.Tests.Shapes;
 
 /// <summary>
 ///     Validates <see cref="CacheCorrectnessAnalyzer"/>: every
-///     <c>ShapeBuilder.Project&lt;TModel&gt;</c> invocation with a <c>TModel</c>
+///     <c>TypeShape.Etch&lt;TModel&gt;</c> invocation with a <c>TModel</c>
 ///     that stores a Roslyn reference type (<c>ISymbol</c>, <c>SyntaxNode</c>,
 ///     <c>Compilation</c>, <c>SemanticModel</c>, <c>SyntaxTree</c>, <c>Location</c>,
 ///     <c>AttributeData</c>) should emit SCRIBE200 pointing at the offending member.
@@ -33,9 +33,9 @@ public class Use
 {
     public void M()
     {
-        var _ = Shape.Class()
+        var _ = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Bad>((in ShapeProjectionContext ctx) => new Bad(null!));
+            .Etch<Bad>((in ShapeEtchContext ctx) => new Bad(null!));
     }
 }
 ";
@@ -64,9 +64,9 @@ public class Use
 {
     public void M()
     {
-        var _ = Shape.Class()
+        var _ = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Bad>((in ShapeProjectionContext ctx) => new Bad());
+            .Etch<Bad>((in ShapeEtchContext ctx) => new Bad());
     }
 }
 ";
@@ -92,9 +92,9 @@ public class Use
 {
     public void M()
     {
-        var _ = Shape.Class()
+        var _ = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Bad>((in ShapeProjectionContext ctx) => new Bad(null!, null!));
+            .Etch<Bad>((in ShapeEtchContext ctx) => new Bad(null!, null!));
     }
 }
 ";
@@ -119,9 +119,9 @@ public class Use
 {
     public void M()
     {
-        var _ = Shape.Class()
+        var _ = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Good>((in ShapeProjectionContext ctx) => new Good(ctx.Fqn, ""x"", null));
+            .Etch<Good>((in ShapeEtchContext ctx) => new Good(ctx.Fqn, ""x"", null));
     }
 }
 ";
@@ -146,9 +146,9 @@ public class Use
 {
     public void M()
     {
-        var _ = Shape.Class()
+        var _ = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Model>((in ShapeProjectionContext ctx) => new Model(ctx.Fqn));
+            .Etch<Model>((in ShapeEtchContext ctx) => new Model(ctx.Fqn));
     }
 }
 ";
@@ -170,9 +170,9 @@ public class Use
 {
     public void M()
     {
-        var _ = Shape.Class()
+        var _ = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Bad>((in ShapeProjectionContext ctx) => new Bad(null!));
+            .Etch<Bad>((in ShapeEtchContext ctx) => new Bad(null!));
     }
 }
 ";
@@ -198,7 +198,7 @@ public class Use
             if (refs.OfType<PortableExecutableReference>().Any(r => string.Equals(r.FilePath, asm.Location, System.StringComparison.OrdinalIgnoreCase))) return;
             refs.Add(MetadataReference.CreateFromFile(asm.Location));
         }
-        AddIfMissing(typeof(Scribe.Shapes.Shape).Assembly);
+        AddIfMissing(typeof(Scribe.Shapes.Stencil).Assembly);
         AddIfMissing(typeof(Scribe.Cache.LocationInfo).Assembly);
         AddIfMissing(typeof(Microsoft.CodeAnalysis.ISymbol).Assembly);
         var compilation = CSharpCompilation.Create(

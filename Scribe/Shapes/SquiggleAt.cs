@@ -2,7 +2,7 @@ namespace Scribe.Shapes;
 
 /// <summary>
 ///     Closed enumeration of squiggle anchor points on a type declaration.
-///     Each <see cref="ShapeBuilder"/> primitive picks an opinionated default
+///     Each <see cref="TypeShape"/> primitive picks an opinionated default
 ///     so the diagnostic lands in the most editorially-useful place.
 /// </summary>
 public enum SquiggleAt

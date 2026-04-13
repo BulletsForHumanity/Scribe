@@ -11,13 +11,13 @@ using Xunit;
 namespace Scribe.Tests.Shapes;
 
 /// <summary>
-///     Verifies cache correctness of <see cref="Relation.Pair{TLeft, TRight}"/> by
+///     Verifies cache correctness of <see cref="Prism.By{TLeft, TRight}"/> by
 ///     running the generator twice with a tracked driver and inspecting
 ///     <see cref="IncrementalStepRunReason"/>s. An unrelated edit must not cause
-///     the matched-pair step to re-execute — otherwise the whole point of projecting
+///     the matched step to re-execute — otherwise the whole point of projecting
 ///     into cache-safe models is wasted.
 /// </summary>
-public class RelationPairIncrementalityTests
+public class PrismIncrementalityTests
 {
     private const string MatchedTrackingName = "scribe-test-matched";
 
@@ -25,27 +25,27 @@ public class RelationPairIncrementalityTests
 
     private readonly record struct Event(string Fqn, string Name);
 
-    private sealed class PairGenerator : IIncrementalGenerator
+    private sealed class PrismGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            var commandShape = Shape.Class()
+            var commandShape = Stencil.ExposeClass()
                 .MustHaveAttribute("CommandAttribute")
-                .Project<Command>((in ShapeProjectionContext ctx) =>
+                .Etch<Command>((in ShapeEtchContext ctx) =>
                     new Command(ctx.Fqn, ctx.Attribute.Ctor<string>(0) ?? string.Empty));
 
-            var eventShape = Shape.Class()
+            var eventShape = Stencil.ExposeClass()
                 .MustHaveAttribute("EventAttribute")
-                .Project<Event>((in ShapeProjectionContext ctx) =>
+                .Etch<Event>((in ShapeEtchContext ctx) =>
                     new Event(ctx.Fqn, ctx.Fqn));
 
-            var pair = Relation.Pair(
+            var prism = Prism.By(
                 commandShape.ToProvider(context),
                 eventShape.ToProvider(context),
                 c => c.RaisesEventName,
                 e => e.Name);
 
-            var tracked = pair.Matched.WithTrackingName(MatchedTrackingName);
+            var tracked = prism.Matched.WithTrackingName(MatchedTrackingName);
             context.RegisterSourceOutput(tracked, (_, _) => { });
         }
     }
@@ -63,7 +63,7 @@ public class RelationPairIncrementalityTests
 
     private static CSharpGeneratorDriver MakeDriver() =>
         CSharpGeneratorDriver.Create(
-            generators: [new PairGenerator().AsSourceGenerator()],
+            generators: [new PrismGenerator().AsSourceGenerator()],
             additionalTexts: default,
             parseOptions: null,
             optionsProvider: null,

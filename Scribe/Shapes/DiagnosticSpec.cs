@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 namespace Scribe.Shapes;
 
 /// <summary>
-///     Selective override for a <see cref="ShapeBuilder"/> check's default diagnostic
+///     Selective override for a <see cref="TypeShape"/> check's default diagnostic
 ///     descriptor. Any field left <see langword="null"/> keeps the primitive's default.
 /// </summary>
 /// <param name="Id">Diagnostic ID (defaults to <c>SCRIBE</c>-prefixed per primitive).</param>

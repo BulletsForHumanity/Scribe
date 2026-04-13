@@ -41,6 +41,8 @@ My purpose here is singular: to bring Scribe into the world in its highest possi
 | Document | What it covers |
 | --- | --- |
 | [README](../README.md) | Overview, quick start, component table, doc index |
+| [Glossary](../docs/glossary.md) | Canonical definitions of Shape DSL vocabulary (Shape, Focus, Lens, Projection, Violation, Relation) and text-emission primitives |
+| [The Shape DSL](../docs/dsl.md) | Overview of Scribe's query language — building blocks, composition rules, fluent vs query-comprehension form, three-consumer materialisation |
 | [Writing Generators](../docs/writing-generators.md) | Transform -> Register -> Render pattern, Quill usage guide |
 | [Project Setup](../docs/project-setup.md) | .csproj configuration, packaging, Stubs, LocalDev multi-repo workflow with automatic local NuGet resolution |
 | [Quill Reference](../docs/quill-reference.md) | Complete Quill API reference |

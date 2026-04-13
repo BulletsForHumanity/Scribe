@@ -7,20 +7,22 @@ using Scribe.Cache;
 namespace Scribe.Shapes;
 
 /// <summary>
-///     Join two shape streams on a key. Produces a matched-pair stream plus an
-///     opt-in diagnostic stream for orphaned sides. Orphans are silent by default —
-///     the pair is a query, not a requirement — so the author must declare
-///     what missing means by calling <see cref="PairBuilder{TLeft, TRight}.RequireLeftHasRight"/>
-///     or <see cref="PairBuilder{TLeft, TRight}.WarnOnRightUnused"/>.
+///     Keyed refocus across two shape streams. A Prism combines or separates streams
+///     by matching on a computed key — custom-cut optics for cross-stream joins where
+///     no structural edge exists. Produces a matched stream plus an opt-in diagnostic
+///     stream for orphaned sides. Orphans are silent by default — the prism is a
+///     query, not a requirement — so the author declares what "missing" means by
+///     calling <see cref="PrismBuilder{TLeft, TRight}.RequireLeftHasRight"/> or
+///     <see cref="PrismBuilder{TLeft, TRight}.WarnOnRightUnused"/>.
 /// </summary>
-public static class Relation
+public static class Prism
 {
     /// <summary>
     ///     Join <paramref name="left"/> and <paramref name="right"/> by equal keys.
-    ///     The returned builder lazily wires matched-pair and diagnostic providers
-    ///     when their properties are first accessed.
+    ///     The returned builder lazily wires matched and diagnostic providers when
+    ///     their properties are first accessed.
     /// </summary>
-    public static PairBuilder<TLeft, TRight> Pair<TLeft, TRight>(
+    public static PrismBuilder<TLeft, TRight> By<TLeft, TRight>(
         IncrementalValuesProvider<ShapedSymbol<TLeft>> left,
         IncrementalValuesProvider<ShapedSymbol<TRight>> right,
         Func<TLeft, string> leftKey,
@@ -31,10 +33,10 @@ public static class Relation
 }
 
 /// <summary>
-///     Configuration surface for a <see cref="Relation.Pair{TLeft, TRight}"/> join.
+///     Configuration surface for a <see cref="Prism.By{TLeft, TRight}"/> join.
 ///     Each orphan policy returns <c>this</c> so the declaration reads left-to-right.
 /// </summary>
-public sealed class PairBuilder<TLeft, TRight>
+public sealed class PrismBuilder<TLeft, TRight>
     where TLeft : IEquatable<TLeft>
     where TRight : IEquatable<TRight>
 {
@@ -46,7 +48,7 @@ public sealed class PairBuilder<TLeft, TRight>
     private OrphanPolicy? _leftHasRight;
     private OrphanPolicy? _rightUnused;
 
-    internal PairBuilder(
+    internal PrismBuilder(
         IncrementalValuesProvider<ShapedSymbol<TLeft>> left,
         IncrementalValuesProvider<ShapedSymbol<TRight>> right,
         Func<TLeft, string> leftKey,
@@ -62,7 +64,7 @@ public sealed class PairBuilder<TLeft, TRight>
     ///     Emit a diagnostic for every left-side item whose key matches no right-side
     ///     item. The message receives <c>{0} = left.Fqn</c> and <c>{1} = missing key</c>.
     /// </summary>
-    public PairBuilder<TLeft, TRight> RequireLeftHasRight(
+    public PrismBuilder<TLeft, TRight> RequireLeftHasRight(
         string id,
         string title,
         string messageFormat,
@@ -76,7 +78,7 @@ public sealed class PairBuilder<TLeft, TRight>
     ///     Emit a diagnostic for every right-side item whose key is not referenced by
     ///     any left-side item. The message receives <c>{0} = right.Fqn</c>.
     /// </summary>
-    public PairBuilder<TLeft, TRight> WarnOnRightUnused(
+    public PrismBuilder<TLeft, TRight> WarnOnRightUnused(
         string id,
         string title,
         string messageFormat,
@@ -91,7 +93,7 @@ public sealed class PairBuilder<TLeft, TRight>
     ///     right-side item sharing its key; duplicate right-side keys drop to first-
     ///     wins in v1 (a <c>RequireUniqueRightKey</c> overload may be added later).
     /// </summary>
-    public IncrementalValuesProvider<ShapedPair<TLeft, TRight>> Matched
+    public IncrementalValuesProvider<ShapedPrism<TLeft, TRight>> Matched
     {
         get
         {
@@ -206,7 +208,7 @@ public sealed class PairBuilder<TLeft, TRight>
             id: policy.Id,
             title: policy.Title,
             messageFormat: policy.MessageFormat,
-            category: "Scribe.Relation",
+            category: "Scribe.Prism",
             defaultSeverity: policy.Severity,
             isEnabledByDefault: true);
 
@@ -266,7 +268,7 @@ public sealed class PairBuilder<TLeft, TRight>
         return builder.ToImmutable();
     }
 
-    private static ShapedPair<TLeft, TRight>? TryPair(
+    private static ShapedPrism<TLeft, TRight>? TryPair(
         ShapedSymbol<TLeft> left,
         ImmutableDictionary<string, ShapedSymbol<TRight>> rightByKey,
         Func<TLeft, string> leftKey)
@@ -278,7 +280,7 @@ public sealed class PairBuilder<TLeft, TRight>
         }
 
         return rightByKey.TryGetValue(key, out var right)
-            ? new ShapedPair<TLeft, TRight>(left, right)
+            ? new ShapedPrism<TLeft, TRight>(left, right)
             : null;
     }
 

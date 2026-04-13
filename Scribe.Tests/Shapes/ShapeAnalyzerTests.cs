@@ -27,9 +27,9 @@ public class ShapeAnalyzerTests
     [Fact]
     public void MustBePartial_emits_SCRIBE001_at_type_keyword_on_non_partial_class()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = "public class Widget { }";
         var diagnostics = RunAnalyzer(shape, source);
@@ -46,9 +46,9 @@ public class ShapeAnalyzerTests
     [Fact]
     public void MustBePartial_emits_nothing_when_class_is_partial()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public partial class Widget { }");
 
@@ -58,9 +58,9 @@ public class ShapeAnalyzerTests
     [Fact]
     public void MustBeSealed_emits_SCRIBE005_at_type_keyword()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeSealed()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
 
@@ -75,10 +75,10 @@ public class ShapeAnalyzerTests
         // First MustHaveAttribute is promoted to the selector — it narrows the shape's
         // scope to types that carry ThingAttribute. A second MustHaveAttribute runs as
         // a regular check on those narrowed types.
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveAttribute("ThingAttribute")
             .MustHaveAttribute("MarkerAttribute")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public sealed class ThingAttribute : System.Attribute { }
@@ -97,9 +97,9 @@ public sealed class MarkerAttribute : System.Attribute { }
     [Fact]
     public void MustImplement_squiggles_at_base_list_when_present_and_encodes_interface()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustImplement("System.IDisposable")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = "public class Widget : System.IComparable { public int CompareTo(object o) => 0; }";
         var diagnostics = RunAnalyzer(shape, source);
@@ -116,10 +116,10 @@ public sealed class MarkerAttribute : System.Attribute { }
     [Fact]
     public void Analyzer_ignores_types_that_do_not_carry_the_primary_attribute()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveAttribute("ThingAttribute")
             .MustBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public sealed class ThingAttribute : System.Attribute { }

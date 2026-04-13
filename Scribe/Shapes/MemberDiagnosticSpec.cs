@@ -4,7 +4,7 @@ namespace Scribe.Shapes;
 
 /// <summary>
 ///     Declarative descriptor for a member-level check registered via
-///     <see cref="ShapeBuilder.ForEachMember"/>. Unlike <see cref="DiagnosticSpec"/>
+///     <see cref="TypeShape.ForEachMember"/>. Unlike <see cref="DiagnosticSpec"/>
 ///     (which overrides a primitive's built-in defaults) this spec is fully
 ///     user-defined — <see cref="Id"/>, <see cref="Title"/>, and <see cref="Message"/>
 ///     are required.

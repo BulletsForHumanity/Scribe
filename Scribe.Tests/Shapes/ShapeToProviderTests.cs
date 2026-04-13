@@ -24,10 +24,10 @@ public class ShapeToProviderTests
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            var shape = Shape.Class()
+            var shape = Stencil.ExposeClass()
                 .MustHaveAttribute("ThingAttribute")
                 .MustBePartial()
-                .Project<CollectedModel>((in ShapeProjectionContext ctx) => new CollectedModel(
+                .Etch<CollectedModel>((in ShapeEtchContext ctx) => new CollectedModel(
                     Fqn: ctx.Fqn,
                     ViolationCount: 0));
 
@@ -53,9 +53,9 @@ public class ShapeToProviderTests
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            var shape = Shape.Class()
+            var shape = Stencil.ExposeClass()
                 .MustBePartial()
-                .Project<CollectedModel>((in ShapeProjectionContext ctx) => new CollectedModel(
+                .Etch<CollectedModel>((in ShapeEtchContext ctx) => new CollectedModel(
                     Fqn: ctx.Fqn,
                     ViolationCount: 0));
 
@@ -146,9 +146,9 @@ public class ShapeToProviderTests
 
         var generator = new InlineGenerator(ctx =>
         {
-            var shape = Shape.Class()
+            var shape = Stencil.ExposeClass()
                 .MustHaveAttribute("FooAttribute")
-                .Project<ValueModel>((in ShapeProjectionContext pc) => new ValueModel(
+                .Etch<ValueModel>((in ShapeEtchContext pc) => new ValueModel(
                     pc.Fqn,
                     pc.Attribute.Ctor<string>(0) ?? "<none>"));
 

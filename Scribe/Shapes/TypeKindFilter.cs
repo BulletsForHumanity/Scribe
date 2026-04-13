@@ -2,7 +2,7 @@ namespace Scribe.Shapes;
 
 /// <summary>
 ///     Coarse type-kind filter applied at the syntax stage before semantic analysis.
-///     Picked by <see cref="Shape.Class"/>, <see cref="Shape.Record"/>, etc.
+///     Picked by <see cref="Stencil.ExposeClass"/>, <see cref="Stencil.ExposeRecord"/>, etc.
 /// </summary>
 internal enum TypeKindFilter
 {

@@ -6,7 +6,7 @@ using Scribe.Cache;
 namespace Scribe.Shapes;
 
 /// <summary>
-///     Internal representation of a member-level check on a <see cref="ShapeBuilder"/>.
+///     Internal representation of a member-level check on a <see cref="TypeShape"/>.
 ///     Runs per declared member of each matched type; emits one diagnostic per
 ///     member that satisfies <see cref="Match"/>.
 /// </summary>

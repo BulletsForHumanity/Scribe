@@ -34,9 +34,9 @@ public class ShapePhase8_5Tests
     [Fact]
     public void MustNotBePartial_emits_SCRIBE002_with_RemovePartialModifier_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public partial class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -47,9 +47,9 @@ public class ShapePhase8_5Tests
     [Fact]
     public async Task MustNotBePartial_fix_removes_partial_keyword()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "public partial class Widget { }");
         result.ShouldNotContain("partial");
@@ -59,9 +59,9 @@ public class ShapePhase8_5Tests
     [Fact]
     public void MustNotBeSealed_emits_SCRIBE006_with_RemoveSealedModifier_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBeSealed()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public sealed class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -72,9 +72,9 @@ public class ShapePhase8_5Tests
     [Fact]
     public async Task MustNotBeSealed_fix_removes_sealed_keyword()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBeSealed()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "public sealed class Widget { }");
         result.ShouldNotContain("sealed");
@@ -84,9 +84,9 @@ public class ShapePhase8_5Tests
     [Fact]
     public void MustNotHaveAttribute_emits_SCRIBE004_with_RemoveAttribute_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotHaveAttribute("MarkerAttribute")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public sealed class MarkerAttribute : System.Attribute { }
@@ -104,9 +104,9 @@ public sealed class MarkerAttribute : System.Attribute { }
     [Fact]
     public async Task MustNotHaveAttribute_fix_removes_attribute_from_type()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotHaveAttribute("MarkerAttribute")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public sealed class MarkerAttribute : System.Attribute { }
@@ -120,9 +120,9 @@ public sealed class MarkerAttribute : System.Attribute { }
     [Fact]
     public void MustNotBeNamed_emits_SCRIBE030_with_no_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBeNamed(@"^.*Impl$")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class WidgetImpl { }");
         diagnostics.Length.ShouldBe(1);
@@ -133,9 +133,9 @@ public sealed class MarkerAttribute : System.Attribute { }
     [Fact]
     public void MustNotBeStatic_emits_SCRIBE018_with_RemoveStaticModifier_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBeStatic()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public static class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -146,9 +146,9 @@ public sealed class MarkerAttribute : System.Attribute { }
     [Fact]
     public async Task MustNotBeStatic_fix_removes_static_keyword()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBeStatic()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "public static class Widget { }");
         result.ShouldNotContain("static");
@@ -158,10 +158,10 @@ public sealed class MarkerAttribute : System.Attribute { }
     [Fact]
     public void MustNotExtend_emits_SCRIBE010_and_encodes_baseClass_for_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveAttribute("MarkerAttribute")
             .MustNotExtend("MyBase")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public sealed class MarkerAttribute : System.Attribute { }
@@ -180,10 +180,10 @@ public class MyBase { }
     [Fact]
     public async Task MustNotExtend_fix_removes_base_class_from_base_list()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveAttribute("MarkerAttribute")
             .MustNotExtend("MyBase")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public sealed class MarkerAttribute : System.Attribute { }
@@ -199,9 +199,9 @@ public class MyBase { }
     [Fact]
     public void MustNotBeInNamespace_emits_SCRIBE028_with_no_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBeInNamespace(@"^MyApp\.Legacy(\..*)?$")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = "namespace MyApp.Legacy { public class Widget { } }";
         var diagnostics = RunAnalyzer(shape, source);
@@ -213,9 +213,9 @@ public class MyBase { }
     [Fact]
     public void MustBeGeneric_emits_SCRIBE023_on_non_generic_class_with_no_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeGeneric()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -226,9 +226,9 @@ public class MyBase { }
     [Fact]
     public void MustBeGeneric_allows_generic_class()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeGeneric()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         RunAnalyzer(shape, "public class Widget<T> { }").ShouldBeEmpty();
     }
@@ -240,9 +240,9 @@ public class MyBase { }
     [Fact]
     public void MustBePublic_emits_SCRIBE011_with_SetVisibility_fix_and_visibility_property()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePublic()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "internal class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -254,9 +254,9 @@ public class MyBase { }
     [Fact]
     public async Task MustBePublic_fix_rewrites_visibility_to_public()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePublic()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "internal class Widget { }");
         result.ShouldContain("public class Widget");
@@ -266,9 +266,9 @@ public class MyBase { }
     [Fact]
     public void MustBeInternal_emits_SCRIBE013_with_SetVisibility_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeInternal()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -279,9 +279,9 @@ public class MyBase { }
     [Fact]
     public async Task MustBeInternal_fix_rewrites_visibility_to_internal()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeInternal()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "public class Widget { }");
         result.ShouldContain("internal class Widget");
@@ -291,9 +291,9 @@ public class MyBase { }
     [Fact]
     public void MustNotBePublic_emits_SCRIBE012_with_no_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBePublic()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -304,9 +304,9 @@ public class MyBase { }
     [Fact]
     public void MustNotBeInternal_allows_public_class()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustNotBeInternal()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         RunAnalyzer(shape, "public class Widget { }").ShouldBeEmpty();
     }
@@ -318,9 +318,9 @@ public class MyBase { }
     [Fact]
     public void MustBeRecord_emits_SCRIBE019_on_plain_class_with_no_fix()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeRecord()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -331,9 +331,9 @@ public class MyBase { }
     [Fact]
     public void MustBeRecord_allows_record_class()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeRecord()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         RunAnalyzer(shape, "public record class Widget(int X);").ShouldBeEmpty();
     }
@@ -341,9 +341,9 @@ public class MyBase { }
     [Fact]
     public void MustNotBeRecord_emits_SCRIBE020_on_record()
     {
-        var shape = Shape.Record()
+        var shape = Stencil.ExposeRecord()
             .MustNotBeRecord()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public record class Widget(int X);");
         diagnostics.Length.ShouldBe(1);
@@ -353,15 +353,15 @@ public class MyBase { }
     [Fact]
     public void MustBeValueType_emits_SCRIBE021_on_class_and_skips_struct()
     {
-        var shape = Shape.Struct()
+        var shape = Stencil.ExposeStruct()
             .MustBeValueType()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         RunAnalyzer(shape, "public struct Widget { }").ShouldBeEmpty();
 
-        var shapeClass = Shape.Class()
+        var shapeClass = Stencil.ExposeClass()
             .MustBeValueType()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shapeClass, "public class Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -371,9 +371,9 @@ public class MyBase { }
     [Fact]
     public void MustNotBeValueType_emits_SCRIBE022_on_struct()
     {
-        var shape = Shape.Struct()
+        var shape = Stencil.ExposeStruct()
             .MustNotBeValueType()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var diagnostics = RunAnalyzer(shape, "public struct Widget { }");
         diagnostics.Length.ShouldBe(1);
@@ -387,9 +387,9 @@ public class MyBase { }
     [Fact]
     public void MustHaveParameterlessConstructor_allows_class_with_no_explicit_ctors()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveParameterlessConstructor()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         RunAnalyzer(shape, "public class Widget { }").ShouldBeEmpty();
     }
@@ -397,9 +397,9 @@ public class MyBase { }
     [Fact]
     public void MustHaveParameterlessConstructor_emits_SCRIBE031_when_only_parameterised_ctor_exists()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveParameterlessConstructor()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = "public class Widget { public Widget(int x) { } }";
         var diagnostics = RunAnalyzer(shape, source);
@@ -411,9 +411,9 @@ public class MyBase { }
     [Fact]
     public async Task MustHaveParameterlessConstructor_fix_adds_public_parameterless_ctor()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveParameterlessConstructor()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = "public class Widget { public Widget(int x) { } }";
         var result = await ApplyFirstFix(shape, source);
@@ -471,7 +471,7 @@ public class MyBase { }
                 && !string.IsNullOrEmpty(k)
                 && k != "None");
 
-        var fixProvider = shape.ToFixProvider();
+        var fixProvider = shape.ToInk();
         var actions = new List<CodeAction>();
         var context = new CodeFixContext(
             document,

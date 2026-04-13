@@ -19,11 +19,15 @@ public readonly record struct DiagnosticInfo(
     string Id,
     DiagnosticSeverity Severity,
     EquatableArray<string> MessageArgs,
-    LocationInfo? Location)
+    LocationInfo? Location,
+    string? FocusPath = null)
 {
     /// <summary>
     ///     Combine this cache-safe record with the user-supplied descriptor and produce a
-    ///     real <see cref="Diagnostic"/> for reporting.
+    ///     real <see cref="Diagnostic"/> for reporting. When <see cref="FocusPath"/> is
+    ///     non-null, the rendered message is prefixed with <c>"[path] "</c> — the B.8
+    ///     focus-path breadcrumb that tells the reader which lens hops produced the
+    ///     violation.
     /// </summary>
     /// <param name="descriptor">
     ///     The descriptor to use. Its <see cref="DiagnosticDescriptor.Id"/> should match
@@ -32,9 +36,32 @@ public readonly record struct DiagnosticInfo(
     public Diagnostic Materialize(DiagnosticDescriptor descriptor)
     {
         var location = Location?.ToLocation() ?? Microsoft.CodeAnalysis.Location.None;
-        return MessageArgs.IsEmpty
-            ? Diagnostic.Create(descriptor, location)
-            : Diagnostic.Create(descriptor, location, ToObjectArray(MessageArgs));
+
+        if (FocusPath is null)
+        {
+            return MessageArgs.IsEmpty
+                ? Diagnostic.Create(descriptor, location)
+                : Diagnostic.Create(descriptor, location, ToObjectArray(MessageArgs));
+        }
+
+        var rendered = MessageArgs.IsEmpty
+            ? descriptor.MessageFormat.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                descriptor.MessageFormat.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ToObjectArray(MessageArgs));
+
+        var wrapped = new DiagnosticDescriptor(
+            id: descriptor.Id,
+            title: descriptor.Title,
+            messageFormat: "[" + FocusPath + "] " + rendered,
+            category: descriptor.Category,
+            defaultSeverity: descriptor.DefaultSeverity,
+            isEnabledByDefault: descriptor.IsEnabledByDefault,
+            description: descriptor.Description,
+            helpLinkUri: descriptor.HelpLinkUri);
+
+        return Diagnostic.Create(wrapped, location);
     }
 
     private static object?[] ToObjectArray(EquatableArray<string> args)

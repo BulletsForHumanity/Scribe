@@ -3,18 +3,23 @@
       Scribe.Sdk — Phase: MetaConsumer
 
       Lets a project depend on a sibling Meta (build-time-only analyzer/generator)
-      with a single declaration that behaves differently per Configuration:
+      with a single declaration that behaves differently per build context:
 
-        Debug    → <PackageReference> to the Meta's -dev.* nupkg, pulled from
-                   $(ScribePackagesDir) via NuGet.config's LocalArtifacts source.
-                   VersionOverride="0.0.0-dev.*" floats to the latest timestamped
-                   package, which is how VS reliably refreshes the analyzer load
-                   context when the Meta source changes.
+        Local dev  → <PackageReference> to the Meta's -dev.* nupkg, pulled from
+                     $(ScribePackagesDir) via the LocalScribe packages source.
+                     VersionOverride="*-*" floats to the latest timestamped
+                     package, which is how VS reliably refreshes the analyzer
+                     load context when the Meta source changes.
 
-        Release  → <ProjectReference OutputItemType="Analyzer"
-                   ReferenceOutputAssembly="false">. CI-safe — no dependency on
-                   a pre-pack step; the build graph orders Meta before its
-                   consumer naturally.
+        CI         → <ProjectReference OutputItemType="Analyzer"
+                     ReferenceOutputAssembly="false">. No bootstrap dependency
+                     on a pre-pack step; the build graph orders Meta before its
+                     consumer naturally.
+
+      The switch is $(ContinuousIntegrationBuild) — the real axis ("is a build
+      server driving this"), not $(Configuration) which can diverge from CI
+      intent. Directory.Build.props sets $(ContinuousIntegrationBuild)=true
+      when $(GITHUB_ACTIONS)=true; override manually for other CI systems.
 
       Intended for intra-solution Metas only. Cross-repo consumers install the
       published Meta nupkg directly — no ScribeMeta wrapper needed.
@@ -36,24 +41,23 @@
            Condition="'%(ScribeMeta.Identity)' != '' and '%(ScribeMeta.PackageId)' == ''" />
   </Target>
 
-  <!-- Debug: pull the -dev.* nupkg. VersionOverride floats to the newest
-       timestamped package under $(ScribePackagesDir), which drives VS's
+  <!-- Local dev: pull the -dev.* nupkg. VersionOverride="*-*" floats to the
+       newest prerelease package under $(ScribePackagesDir), which drives VS's
        analyzer refresh on each Meta rebuild. Bypasses CPM (no matching
        PackageVersion entry needed in Directory.Packages.props).
 
        Item-transform @(ScribeMeta->'%(PackageId)') projects each ScribeMeta
        entry into its PackageId (expansion works in ItemGroup scope; bare
        %(ScribeMeta.PackageId) does not — that only expands inside a Target). -->
-  <ItemGroup Condition="'$(Configuration)' == 'Debug' and '@(ScribeMeta)' != ''">
+  <ItemGroup Condition="'$(ContinuousIntegrationBuild)' != 'true' and '@(ScribeMeta)' != ''">
     <PackageReference Include="@(ScribeMeta->'%(PackageId)')"
-                      VersionOverride="0.0.0-dev.*"
+                      VersionOverride="*-*"
                       PrivateAssets="all"
                       IncludeAssets="analyzers;build" />
   </ItemGroup>
 
-  <!-- Release: ProjectReference path. CI and published-release builds take this
-       route so there's no bootstrap dependency on a pre-existing Meta nupkg. -->
-  <ItemGroup Condition="'$(Configuration)' != 'Debug' and '@(ScribeMeta)' != ''">
+  <!-- CI: ProjectReference path. No dependency on a pre-existing Meta nupkg. -->
+  <ItemGroup Condition="'$(ContinuousIntegrationBuild)' == 'true' and '@(ScribeMeta)' != ''">
     <ProjectReference Include="@(ScribeMeta)"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />

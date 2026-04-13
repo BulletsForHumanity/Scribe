@@ -18,7 +18,7 @@ using Xunit;
 namespace Scribe.Tests.Shapes;
 
 /// <summary>
-///     Validates that <see cref="ShapeInkExtensions.ToFixProvider"/> dispatches
+///     Validates that <see cref="ShapeInkExtensions.ToInk"/> dispatches
 ///     each <see cref="FixKind"/> to the correct code action and produces the
 ///     expected source transformation.
 /// </summary>
@@ -31,9 +31,9 @@ public class ShapeFixProviderTests
     [Fact]
     public async Task AddPartialModifier_adds_partial_keyword()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePartial()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "public class Widget { }");
         result.ShouldContain("partial class Widget");
@@ -42,9 +42,9 @@ public class ShapeFixProviderTests
     [Fact]
     public async Task AddSealedModifier_adds_sealed_keyword_before_partial()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBeSealed()
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "public partial class Widget { }");
         result.ShouldContain("sealed partial class Widget");
@@ -53,9 +53,9 @@ public class ShapeFixProviderTests
     [Fact]
     public async Task AddInterfaceToBaseList_appends_interface_when_base_list_absent()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustImplement("System.IDisposable")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var result = await ApplyFirstFix(shape, "public sealed class Widget { public void Dispose() { } }");
         result.ShouldContain(": System.IDisposable");
@@ -64,9 +64,9 @@ public class ShapeFixProviderTests
     [Fact]
     public async Task AddInterfaceToBaseList_appends_to_existing_base_list()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustImplement("System.IDisposable")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = "public class Widget : System.IComparable { public int CompareTo(object o) => 0; public void Dispose() { } }";
         var result = await ApplyFirstFix(shape, source);
@@ -78,10 +78,10 @@ public class ShapeFixProviderTests
     public async Task AddAttribute_prepends_attribute_without_Attribute_suffix()
     {
         // Primary selector is ThingAttribute; Marker is the secondary must-have that fires.
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustHaveAttribute("ThingAttribute")
             .MustHaveAttribute("MarkerAttribute")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
 public sealed class ThingAttribute : System.Attribute { }
@@ -94,15 +94,15 @@ public sealed class MarkerAttribute : System.Attribute { }
     }
 
     [Fact]
-    public async Task ToFixProvider_reports_all_check_ids_as_fixable()
+    public async Task ToInk_reports_all_check_ids_as_fixable()
     {
-        var shape = Shape.Class()
+        var shape = Stencil.ExposeClass()
             .MustBePartial()
             .MustBeSealed()
             .MustImplement("System.IDisposable")
-            .Project<Collected>((in ShapeProjectionContext ctx) => new Collected(ctx.Fqn));
+            .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
-        var provider = shape.ToFixProvider();
+        var provider = shape.ToInk();
         provider.FixableDiagnosticIds.ShouldBe(_allThreeIds);
     }
 
@@ -126,7 +126,7 @@ public sealed class MarkerAttribute : System.Attribute { }
 
         var first = diagnostics.OrderBy(d => d.Location.SourceSpan.Start).First();
 
-        var fixProvider = shape.ToFixProvider();
+        var fixProvider = shape.ToInk();
         var actions = new List<CodeAction>();
         var context = new CodeFixContext(
             document,
