@@ -175,7 +175,7 @@ Once B.3 lands, every navigated focus needs its own predicate catalogue.
 | Focus | Predicates | v1 status |
 | --- | --- | --- |
 | `AttributeFocus` | (Existence is gated via `min`/`max` on the lens; no predicates needed at v1) | ✅ — lens-level |
-| `TypeArgFocus` | `MustImplement(fqn)`, `MustDeriveFrom(fqn)`, `MustBeParsable()`, re-use via `AsTypeShape()` | ✅ `MustImplement`, `MustDeriveFrom`, `AsTypeShape`; ⏳ `MustBeParsable` deferred |
+| `TypeArgFocus` | `MustImplement(fqn)`, `MustExtend(fqn)`, `MustBeParsable()`, re-use via `AsTypeShape()` | ✅ `MustImplement`, `MustExtend`, `AsTypeShape`; ⏳ `MustBeParsable` deferred |
 | `ConstructorArgFocus<T>` | `MustBe(value)`, `MustSatisfy(pred)`, `MustNotBeEmpty()` | ✅ `MustBe`, `MustNotBeEmpty`; `Satisfy(pred, id, title, …)` available via the generic escape hatch |
 | `NamedArgFocus<T>` | same as `ConstructorArgFocus<T>` | ✅ same status |
 | `BaseTypeChainFocus` | quantifier-only (see B.6) | ⏳ B.6 |
@@ -389,6 +389,58 @@ Shape<Collected> f = Stencil.ExposeClass()
 **Deferred.** Multi-`from` (`SelectMany`) that joins two focus streams into a multi-variable comprehension (as drafted in [dsl.md](dsl.md#query-comprehension-form)). For v1, multi-focus composition is expressed via the lens-entry callbacks (`Attributes(...)`, `Members(...)`, `BaseTypeChain(...)`) which already accept a nested `FocusShape<TFocus>` configure callback.
 
 **Reserved IDs.** `SCRIBE200` — default diagnostic id for single-arg `Where(predicate)` when no explicit spec is supplied.
+
+---
+
+### B.14 AttributeFocus per-instance iteration + set aggregation
+
+**Status (April 2026). ⏳ Not started.** Surfaced by the Hermetic HierarchicalKey migration — WORD1305 (every `[Param]` on a `[KeyPart]` type must declare a parsable type) and WORD1306 (discriminator values must be unique within a `[KeyPart]` hierarchy) are the only two diagnostics that resisted Lithography in the April 2026 pass. Both need **per-attribute squiggles across a repeated attribute**, which today's `.Attributes(fqn, configure, min, max)` lens expresses only as presence / quantifier / cardinality gates — not as per-instance checks with squiggles at the individual attribute-application span.
+
+**What's missing.** Two capabilities, one shape:
+
+1. **Per-instance leaf predicates on `AttributeFocus`.** Authors can navigate *into* an attribute via `ConstructorArg<T>(n)` / `NamedArg<T>(name)` / `GenericTypeArg(n)` and assert leaf predicates there, but cannot stand at the attribute itself and assert "this attribute's argument, viewed as an `ITypeSymbol`, must be parsable" without dropping to `Satisfy<AttributeFocus>(...)`. Satisfy works but produces the diagnostic at the outer lens's anchor, not at *this* attribute's `ApplicationSyntaxReference`.
+2. **Per-group set aggregations on repeated attributes.** B.13's `Unique()` / `UniqueBy(key)` operate on a lens's output set. The aggregation needs per-element violation routing — when three `[Discriminator("X")]` attributes collide, each duplicate squiggles at its own application span, not at the enclosing type.
+
+**Target surface.**
+
+```csharp
+// WORD1305 — per-[Param] parseability, each violation squiggled at the offending attribute.
+typeFocus.Attributes(KnownFqns.ParamAttribute)
+    .ConstructorArg<ITypeSymbol>(index: 1)
+        .MustSatisfy(
+            predicate: static arg => IsParsableType(arg.Value),
+            spec: DiagnosticSpec.Error("WORD1305",
+                "[Param] type must be parsable",
+                "[Param] on '{0}' declares type '{1}' which is neither a primitive nor implements IParsable<T>"));
+
+// WORD1306 — discriminator uniqueness within a KeyPart hierarchy, per-group by enclosing type.
+typeFocus.Attributes(KnownFqns.DiscriminatorAttribute)
+    .ConstructorArg<string>(index: 0)
+        .Unique(
+            spec: DiagnosticSpec.Warning("WORD1306",
+                "Duplicate discriminator value",
+                "Discriminator value '{0}' is declared more than once on '{1}'"));
+```
+
+**What each sub-feature buys.**
+
+| Sub-feature | Buys | Already covered by |
+| --- | --- | --- |
+| Per-attribute squiggle anchor on `AttributeFocus` | Diagnostics land on the `[Param(...)]` / `[Discriminator(...)]` syntax — not on the enclosing type | Partly B.4 (leaf predicates on sub-foci); needs explicit anchor propagation from `AttributeFocus` into its children's `FocusCheck` output |
+| Per-group aggregation scope for `.Unique()` | "Unique *within this type's attributes*" (not globally) is the default for per-type repeated attributes | Promised by B.13 as default; needs the scope semantics pinned down when the aggregation attaches to a sub-lens that dangles off a per-type `Attributes(fqn)` lens |
+| Per-element violation routing for aggregations | Each duplicate-after-first squiggles at its own span, message references the first occurrence | B.13's "diagnostic fusion" design note — squiggle every duplicate after the first, reference the first in the message |
+
+**Design care required.**
+
+- **"Where does the squiggle land?"** For `.ConstructorArg<T>(n).MustSatisfy(...)` the natural anchor is the constructor-argument expression syntax — which today is the smudge anchor for SCRIBE080 family. That already works. The gap is at `AttributeFocus` itself: a leaf predicate that asserts something about the whole attribute (not a specific arg) has no anchor today because `AttributeFocus` is treated as a navigation stop, not a leaf. Fix: give `AttributeFocus` its own `MustSatisfy` / `Satisfy` surface that anchors on `ApplicationSyntaxReference`. Then WORD1305 can land either at the argument (via `ConstructorArg<ITypeSymbol>(1).MustSatisfy`) or at the whole attribute (via `AttributeFocus.MustSatisfy`) depending on what reads best.
+- **`.Unique()` per-group scope.** When `.Unique()` hangs off a sub-lens that is itself inside a per-type lens (the common case), the scope is "within this per-type lens's output set." When it hangs off a top-level lens with no enclosing per-type scope, it's "across the compilation." This is what B.13 calls out as "per-group vs whole-set." The default must be per-group for repeated attributes — whole-set must be explicit via `.Across(...)`.
+- **Interaction with Quantifier.** `.Attributes(...).ConstructorArg<string>(0).Unique()` is set-aggregation, not quantifier-aggregation. A user who writes both (`.Attributes(...)` with `quantifier: Any` and then `.Unique()` on its output) is expressing *"at least one must match, and within the matches no two duplicate"* — a composition the DSL should either support or explicitly reject at authoring time. Proposal: support; the semantics stack naturally.
+
+**Depends on.** B.4 (leaf predicates with fluent-position escape hatches), B.13 (set aggregations).
+
+**Effort.** ~2 days on top of B.13. One new extension method (`MustSatisfy` on `AttributeFocus`), anchor-propagation through the aggregation output, a `.Across(stream)` escape for global-scope uniqueness, unit tests covering the two Hermetic diagnostics end-to-end.
+
+**Where this slots in Part B.** New **B.14 — AttributeFocus per-instance iteration + set aggregation**, lands in Phase 3 alongside B.13. Ship gate: HierarchicalKeyWord.cs drops its `AnalyzeKeyPartResidual` imperative method entirely; WORD1305 and WORD1306 are declared in `HierarchicalKeyShapes.cs` with the surface above; all existing analyzer tests pass.
 
 ---
 
@@ -697,11 +749,64 @@ Adding to Part B:
 - **B.11 — Prism as Shape combinator (returns `Shape<TModel>`)** — ~2 days, depends on B.10.
 - **B.12 — Shape-as-predicate (`MustSatisfy`) with configurable location routing** — ~3 days, depends on B.1 + B.2. Includes V.6 (location mode).
 - **B.13 — Set-level aggregations (`Unique`, `UniqueBy`, `CardinalityAtMost`, `CardinalityExactly`)** — ~3 days, depends on B.3 + B.4.
+- **B.14 — AttributeFocus per-instance iteration + set aggregation** — ~2 days on top of B.13, adds `MustSatisfy` directly on `AttributeFocus` and per-element anchor routing for `.Unique()` / `.UniqueBy()`. Unblocks Hermetic WORD1305/1306 (the last two residual imperative diagnostics in the HKey family).
 - B.3 — note that `AsTypeShape()` applies uniformly to any focus wrapping an `INamedTypeSymbol`, not just `TypeArgFocus`.
 
 Sequence implication: B.10–B.13 all belong in **Phase 3** (composition primitives), landing alongside `OneOf` and quantifiers. They share the same design concern (multi-source Shape composition + cross-element assertions) and the same ship gate: the full HKey analyzer — with KeyShape, PartShape, UnionBaseShape, UnionVariantShape, and DiscShape each authored independently and composed via `MustSatisfy`, Prism, and set predicates — compiles and runs, and every diagnostic lands at the right span without the author doing any location bookkeeping.
 
-**Revised total cost:** ~6 weeks (up from 4.5). Phase 3 grows from 1 week to ~2.5 weeks to absorb B.10–B.13.
+**Revised total cost:** ~6 weeks (up from 4.5). Phase 3 grows from 1 week to ~2.5 weeks to absorb B.10–B.13, plus ~2 days for B.14 on top.
+
+### Quick-reference — B.11 / B.12 / B.13 target surfaces
+
+The three Phase-3 composition primitives are each designed in-situ inside the HKey walkthrough (V.1–V.6). This quick-reference pins their canonical surfaces in one place so future authors don't have to triangulate.
+
+**B.11 — Prism as Shape combinator.** `Prism.By(left, right, mode).Aggregate<TModel>(...)` returns a plain `Shape<TModel>`. Root focus is the left row; violations thread through the normal `ShapedSymbol<TModel>.Violations` array. Materialisation consumers (`ToAnalyzer`, `ToProvider`, `Ink`) operate on it identically to any authored Shape — no Prism-specific code in the consumer.
+
+```csharp
+public static readonly Shape<UnionModel> UnionShape =
+    Prism.By(
+        left:  BaseShape.Select(b => (key: b.Fqn, value: b)),
+        right: VariantShape.Select(v => (key: v.BaseFqn, value: v)),
+        mode:  PrismMode.RequireLeftHasRight)
+    .Aggregate<UnionModel>(static (b, variants) => new UnionModel(b, variants.ToImmutableArray()));
+```
+
+Ship gate: `UnionShape` above is consumed by a test analyzer that reports a fused diagnostic at the base's location when any variant is missing, and `UnionShape` itself can feed back as the `left` input to a second Prism without special-case code.
+
+**B.12 — Shape-as-predicate (`MustSatisfy(subShape)`).** Embeds one authored Shape inside another at a navigated focus; the sub-Shape's violations bubble up to the caller's span (`LocationMode.AtCallSite`, default) or to the sub-Shape's natural anchor (`LocationMode.AtTarget`).
+
+```csharp
+typeFocus.Attributes(KnownFqns.ComposedOf, min: 1)
+    .GenericTypeArg(0)
+        .AsTypeShape()
+        .MustSatisfy(PartShape, mode: LocationMode.AtCallSite);
+```
+
+Ship gate: the three HKey Shapes (`KeyShape`, `PartShape`, `DiscShape`) are authored independently, each with its own unit tests, and composed at call sites via `MustSatisfy` — not by inlining their predicate trees. Violations in `PartShape` triggered from `KeyShape` land at the `[ComposedOf<Foo>]` reference, not at `Foo`'s declaration.
+
+**B.13 — Set-level aggregations.** Six verbs at the same fluent position as Quantifiers but operating on the whole lens output rather than per-element: `Unique()`, `UniqueBy(keySelector)`, `CardinalityExactly(n)`, `CardinalityAtMost(n)`, `AgreeOn(projection)`, `CoveredBy(stream)`. Plus the `SatisfyingSet(custom, spec)` escape hatch at the same fluent position for the long tail.
+
+```csharp
+typeFocus.Attributes(KnownFqns.Discriminator)
+    .ConstructorArg<string>(0)
+        .Unique();
+
+typeFocus.Attributes(KnownFqns.Param)
+    .UniqueBy(a => a.ConstructorArg<string>(nameof(ParamAttribute.Name)));
+
+typeFocus.Attributes(KnownFqns.Primary)
+    .CardinalityAtMost(1);
+
+typeFocus.BaseTypeChain()
+    .AgreeOn(t => t.ContainingNamespace);
+
+UnionBaseShape.Select(b => b.Fqn)
+    .CoveredBy(UnionVariantShape.Select(v => v.BaseFqn));
+```
+
+**Scope semantics (must-decide before ship).** `Unique()` / `UniqueBy()` / `CardinalityAtMost()` on a sub-lens that sits inside a per-type enclosing lens default to **per-group**: the set is "this type's attributes matching the lens," and the aggregation asserts within each group independently. An explicit `.Across(stream)` overrides to **whole-set** scope. `AgreeOn` is per-group by default (all elements of this type's chain live in the same namespace); `CoveredBy` is inherently whole-set because it spans two Shape streams. This contract must be tested with paired per-group / whole-set cases before the primitives surface publicly — getting scope wrong means silent false-negatives.
+
+Ship gate: full HKey analyzer — `KeyShape` + `PartShape` + `DiscShape` + `UnionBaseShape` + `UnionVariantShape` — authored with set predicates where the walkthrough uses them, every diagnostic lands at the right span without the author doing any location bookkeeping, and `HierarchicalKeyWord.cs` drops its imperative `AnalyzeKeyPartResidual` (WORD1305/1306 move into the Shape tree via B.14).
 
 ### The .NET 11 unions angle
 
@@ -711,10 +816,80 @@ The Shape is the contract; the generator is the implementation. That's the point
 
 ---
 
+## Consumer Readiness — Hermetic Migration Status (April 2026)
+
+Result of the April 2026 pass over Hermetic's `Word/` analyzer tree. Groups every Hermetic analyzer by its migration verdict against the primitives shipped at v1 of the Shape DSL.
+
+### Already Lithography-based
+
+| Analyzer | Diagnostics | Shape file |
+| --- | --- | --- |
+| `IdentifierWord` (hybrid wrapper) | WORD1000–WORD1003 (via SCRIBE0xx defaults) | `Essence/IdentifierShape.cs` |
+| `SmartEnumWord` (hybrid wrapper) | SCRIBE001/005/019/033/034 | `Essence/SmartEnumShape.cs` |
+| `HierarchicalKeyWord` (hybrid wrapper) | WORD1300–WORD1304 | `HierarchicalKey/HierarchicalKeyShapes.cs` |
+
+### Clean migration candidates (expressible today)
+
+Seven diagnostics land cleanly on shipped primitives. No new Shape DSL capabilities required — pure migration work.
+
+| Current file | Diagnostic(s) | Primitives used |
+| --- | --- | --- |
+| `Law/EventShapeWord.cs` | WORD2000–WORD2001 | `Implementing` + `MustBeRecord()` + `MustBeSealed()` |
+| `Law/EventHandlerContractWord.cs` | WORD2100–WORD2103, WORD2105 | `Attributes` lens + per-attribute `Satisfy` for target-method presence |
+| `Law/BubblesToWord.cs` | WORD2400 | `Attributes` lens over the four propagation attributes + `Check` for at-most-one |
+| `Law/CommandShapeWord.cs` | WORD2300–WORD2302 | `Members` lens + naming / base-type `Satisfy` predicates |
+| `Law/LawMarkerDerivationWord.cs` | WORD2303 | `Implementing` gateway + `Check` suggesting aggregate-specific markers |
+| `Law/AppliesMethodNamingWord.cs` | WORD2104 | `Members` lens for `[Applies<TEvent>]` + per-method naming `Satisfy` |
+
+### Blocked on B.14 (AttributeFocus iteration + aggregation)
+
+| Current file | Diagnostic(s) | What's missing |
+| --- | --- | --- |
+| `HierarchicalKey/HierarchicalKeyWord.cs` (residual imperative) | WORD1305, WORD1306 | Per-attribute squiggle anchor on `AttributeFocus` + per-group `.Unique()` aggregation (B.14) |
+
+### Remain imperative by design
+
+The following diagnostics are explicitly out of scope for the declaration-shape DSL — every one demonstrates a real-world need for the capability, not a gap in the design.
+
+| Current file | Diagnostic(s) | Reason (matches an Out of Scope entry below) |
+| --- | --- | --- |
+| `Essence/IdentifierDefaultValueWord.cs` | WORD1004 | Operation-level — inspects constructor *call sites* for `default` / `Guid.Empty` / `new Guid()` argument values |
+| `Essence/EssenceWord.cs` | WORD1200 | Operation-level — detects `new Foo(...)` for `IEssence` types at call site + enclosing-scope check for the factory exemption |
+| `Law/CommandEventDeclarationWord.cs` | WORD2200–WORD2205 | Control-flow analysis — tracks unconditional vs conditional event emission across `if` / `switch` / `try` / ternary in the `Handle` method body |
+| `Law/JsonSerializerContextRegistrationWord.cs` | WORD2500 | Whole-compilation aggregation — collects every `[JsonSerializable]` partial across the assembly before asserting coverage over declared Law types |
+| `Law/SealedApiDirectCallWord.cs` | WORD2600 | Operation-level — flags `SendAsync(string, ...)` invocations on Refit interfaces that carry a seal attribute |
+
+---
+
+## Implementation Corrections (April 2026)
+
+Findings from the self-review adversarial pass, addressed in the same wave as the Hermetic migration work.
+
+### F5 — Non-deterministic primary location for partial types *(fixed)*
+
+`symbol.Locations[0]` and `symbol.DeclaringSyntaxReferences[0]` do not guarantee a stable ordering across partial declarations of the same type — the ordering is an implementation detail of the symbol table. Diagnostics for shape violations on a partial type could therefore land on a different file between runs, defeating deterministic cache equality and making suggested fixes unreliable in IDE feedback.
+
+Fix: all location-resolution paths (`Shape<T>.FirstLocation`, `MemberFirstLocation`, `TypeShape.Linq.FirstLocation`, `SquiggleLocator`, `MemberSquiggleLocator`, `MemberSpanComparer`) now route through a single `Scribe.Shapes.DeterministicLocations` helper that picks the primary reference/location by ordinal `(SyntaxTree.FilePath, Span.Start)`. Callers never reach for `[0]` directly.
+
+### F11 — `TypeArgFocus.MustDeriveFrom` renamed to `MustExtend` *(fixed)*
+
+The root `TypeShape` catalogue uses `MustExtend(string)` / `MustNotExtend(string)` for base-class assertions. The navigated `TypeArgFocus` predicate shipped as `MustDeriveFrom(string)` — two spellings for the same semantics, invisible to the IDE when a consumer switches between the root and the navigated form. Renamed to `MustExtend` for exact parity with the root catalogue; the predicate and diagnostic id (`SCRIBE071`) are unchanged.
+
+No other public-surface misalignments were found. The `Implementing(metadataName)` selector gateway on `TypeShape` and the `MustImplement(metadataName)` assertion are intentionally distinct — one gates materialisation, the other raises a diagnostic — and the two-verb pair is documented in [dsl.md](dsl.md).
+
+### F12 — Custom `Diagnostic.Properties` on `.Check` / `.ForEachMember` *(added)*
+
+User-defined checks emit diagnostics whose property bag was limited to the internally-reserved keys (`fixKind`, `squiggleAt`, `memberName`, and the opt-in `customFixTag`). Paired code fixers occasionally need richer structured context that cannot be recovered from the squiggle location alone — e.g. WORD2400 (`BubblesToFix`) needs the two conflicting attribute names and the shared target-type name to offer `Remove [X<T>]` / `Remove [Y<T>]` code actions without re-walking the symbol. Previously such analyzers had to stay imperative.
+
+Fix: both `TypeShape.Check(...)` and `TypeShape.ForEachMember(...)` now accept an optional `properties` delegate (`Func<INamedTypeSymbol, ImmutableDictionary<string, string?>>` and `Func<INamedTypeSymbol, ISymbol, ImmutableDictionary<string, string?>>` respectively). The delegate runs once per reported diagnostic; reserved keys are layered on top and win on collision. This unblocks Shape-DSL migration of analyzers whose fixers depend on diagnostic metadata.
+
+---
+
 ## Out of Scope
 
 Explicitly not in this gap analysis:
 
-- **Operation / expression-level rules.** The DSL describes declaration shape, not method body behaviour. Belongs in a separate operation-walking layer if ever.
+- **Operation / expression-level rules.** The DSL describes declaration shape, not method-body or call-site behaviour. Operation-level analysis (invocation inspection, argument-value constant-folding, control-flow / conditional-path tracking) belongs in a separate operation-walking layer if ever. Real-world examples from Hermetic: WORD1004 (default-value detection at constructor call sites), WORD1200 (`new` vs factory enforcement), WORD2200–WORD2205 (conditional-vs-unconditional event emission inside `Handle` method bodies), WORD2600 (typed-vs-stringly `SendAsync` on sealed Refit interfaces). Each of these wants an `IOperationAction` walk, not a declaration-shape predicate — and each of them is the correct place for that work to live.
+- **Whole-compilation aggregation analyzers.** Analyzers that must visit *every* declaration in the compilation before firing a diagnostic on *any* one declaration (coverage-style assertions across two independent declaration populations). Real-world example: WORD2500 — `[JsonSerializable]` coverage across every partial class of a `JsonSerializerContext` subtype versus the set of every concrete Law type discovered anywhere in the compilation. Today this belongs in `RegisterCompilationStartAction` imperatively. Future: could be modelled as a degenerate `Prism` with `PrismMode.WarnOnRightUnused` when B.10–B.11 graduate beyond v1 — but the consumer ergonomics need more runway before we commit.
 - **Navigated-focus fix catalogue.** `FixKind.Custom` is enough for v1 bespoke fixes on attribute-argument / type-arg violations. A built-in catalogue (e.g. `RemoveAttribute` targeting a navigated `AttributeFocus`) is a later concern.
 - **Cross-compilation / MSBuild integration changes.** The engine is stable; no plumbing changes required for Parts A and B.

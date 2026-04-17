@@ -440,10 +440,7 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
     }
 
     private static Location? MemberFirstLocation(ISymbol member)
-    {
-        var locations = member.Locations;
-        return locations.Length == 0 ? null : locations[0];
-    }
+        => DeterministicLocations.PrimaryLocation(member);
 
     private sealed class MemberSpanComparer : IComparer<ISymbol>
     {
@@ -466,8 +463,8 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
                 return 1;
             }
 
-            var xRef = x.DeclaringSyntaxReferences.Length > 0 ? x.DeclaringSyntaxReferences[0] : null;
-            var yRef = y.DeclaringSyntaxReferences.Length > 0 ? y.DeclaringSyntaxReferences[0] : null;
+            var xRef = DeterministicLocations.PrimaryReference(x);
+            var yRef = DeterministicLocations.PrimaryReference(y);
             if (xRef is null && yRef is null)
             {
                 return string.CompareOrdinal(x.Name, y.Name);
@@ -494,10 +491,7 @@ public sealed partial class Shape<TModel> where TModel : IEquatable<TModel>
     }
 
     private static Location? FirstLocation(INamedTypeSymbol symbol)
-    {
-        var locations = symbol.Locations;
-        return locations.Length == 0 ? null : locations[0];
-    }
+        => DeterministicLocations.PrimaryLocation(symbol);
 
     internal static bool ImplementsInterface(
         INamedTypeSymbol symbol, Compilation compilation, string metadataName)

@@ -1317,6 +1317,15 @@ public sealed partial class TypeShape
     ///     Additional message arguments beyond the type name (<c>{1}</c>, <c>{2}</c>, ...).
     ///     Optional — default yields just the type name as <c>{0}</c>.
     /// </param>
+    /// <param name="properties">
+    ///     Optional factory producing custom <see cref="Diagnostic.Properties"/>. Invoked
+    ///     once per reported diagnostic with the offending symbol. Useful when a paired
+    ///     code fixer needs structured context (e.g. conflicting attribute names, target
+    ///     type names) that cannot be recovered from the squiggle location alone.
+    ///     Reserved keys (<c>fixKind</c>, <c>squiggleAt</c>, <c>customFixTag</c>) are
+    ///     added by the analyzer host after the user-supplied properties and win on
+    ///     collision.
+    /// </param>
     public TypeShape Check(
         Func<INamedTypeSymbol, Compilation, CancellationToken, bool> predicate,
         string id,
@@ -1326,7 +1335,8 @@ public sealed partial class TypeShape
         SquiggleAt squiggle = SquiggleAt.Identifier,
         FixKind fix = FixKind.None,
         string? customFixTag = null,
-        Func<INamedTypeSymbol, EquatableArray<string>>? messageArgs = null)
+        Func<INamedTypeSymbol, EquatableArray<string>>? messageArgs = null,
+        Func<INamedTypeSymbol, ImmutableDictionary<string, string?>>? properties = null)
     {
         if (predicate is null)
         {
@@ -1340,10 +1350,15 @@ public sealed partial class TypeShape
 
         var args = messageArgs ?? (static sym => EquatableArray.Create(sym.Name));
 
-        ImmutableDictionary<string, string?>? fixProps = null;
-        if (fix == FixKind.Custom && !string.IsNullOrEmpty(customFixTag))
+        Func<TypeFocus, ImmutableDictionary<string, string?>>? fixPropsDelegate = null;
+        if (properties is not null)
         {
-            fixProps = ImmutableDictionary<string, string?>.Empty.Add("customFixTag", customFixTag);
+            fixPropsDelegate = focus => properties(focus.Symbol);
+        }
+        else if (fix == FixKind.Custom && !string.IsNullOrEmpty(customFixTag))
+        {
+            var tagProps = ImmutableDictionary<string, string?>.Empty.Add("customFixTag", customFixTag);
+            fixPropsDelegate = _ => tagProps;
         }
 
         _checks.Add(new ShapeCheck(
@@ -1355,7 +1370,7 @@ public sealed partial class TypeShape
             FixKind: fix,
             Predicate: (focus, comp, ct) => predicate(focus.Symbol, comp, ct),
             MessageArgs: focus => args(focus.Symbol),
-            FixProperties: fixProps is null ? null : _ => fixProps));
+            FixProperties: fixPropsDelegate));
         return this;
     }
 
@@ -1380,10 +1395,18 @@ public sealed partial class TypeShape
     /// <param name="match">Offender predicate — <see langword="true"/> reports a diagnostic.</param>
     /// <param name="spec">Diagnostic descriptor.</param>
     /// <param name="messageArgs">Message argument builder. <c>{0}</c> defaults to the type name; the user supplies any remaining args (typically the member name).</param>
+    /// <param name="properties">
+    ///     Optional factory producing custom <see cref="Diagnostic.Properties"/>. Invoked
+    ///     once per reported diagnostic with the declaring type symbol and the offending
+    ///     member symbol. Reserved keys (<c>fixKind</c>, <c>memberSquiggleAt</c>,
+    ///     <c>memberName</c>, <c>customFixTag</c>) are added by the analyzer host after
+    ///     the user-supplied properties and win on collision.
+    /// </param>
     public TypeShape ForEachMember(
         Func<ISymbol, bool> match,
         MemberDiagnosticSpec spec,
-        Func<INamedTypeSymbol, ISymbol, EquatableArray<string>>? messageArgs = null)
+        Func<INamedTypeSymbol, ISymbol, EquatableArray<string>>? messageArgs = null,
+        Func<INamedTypeSymbol, ISymbol, ImmutableDictionary<string, string?>>? properties = null)
     {
         if (match is null)
         {
@@ -1397,8 +1420,8 @@ public sealed partial class TypeShape
 
         var args = messageArgs ?? (static (type, member) => EquatableArray.Create(type.Name, member.Name));
 
-        Func<INamedTypeSymbol, ISymbol, ImmutableDictionary<string, string?>>? fixProps = null;
-        if (spec.Fix == FixKind.Custom && !string.IsNullOrEmpty(spec.CustomFixTag))
+        Func<INamedTypeSymbol, ISymbol, ImmutableDictionary<string, string?>>? fixProps = properties;
+        if (fixProps is null && spec.Fix == FixKind.Custom && !string.IsNullOrEmpty(spec.CustomFixTag))
         {
             var tag = spec.CustomFixTag!;
             fixProps = (_, _) => ImmutableDictionary<string, string?>.Empty.Add("customFixTag", tag);

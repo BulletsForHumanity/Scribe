@@ -46,10 +46,11 @@ public static class TypeArgFocusLeafPredicates
     }
 
     /// <summary>
-    ///     Require the type argument to derive (directly or transitively) from the base
-    ///     class named by <paramref name="metadataName"/>.
+    ///     Require the type argument to extend (directly or transitively) the base
+    ///     class named by <paramref name="metadataName"/>. Name parallels
+    ///     <see cref="TypeShape.MustExtend(string, DiagnosticSpec?)"/>.
     /// </summary>
-    public static FocusShape<TypeArgFocus> MustDeriveFrom(
+    public static FocusShape<TypeArgFocus> MustExtend(
         this FocusShape<TypeArgFocus> shape,
         string metadataName,
         DiagnosticSpec? spec = null)
@@ -67,10 +68,10 @@ public static class TypeArgFocusLeafPredicates
         var interned = InternPool.Intern(metadataName);
         shape.AddCheck(new FocusCheck<TypeArgFocus>(
             Id: InternPool.Intern(spec?.Id ?? "SCRIBE071"),
-            Title: spec?.Title ?? "Type argument must derive from required base",
-            MessageFormat: spec?.Message ?? "Type argument '{0}' must derive from '{1}'",
+            Title: spec?.Title ?? "Type argument must extend required base",
+            MessageFormat: spec?.Message ?? "Type argument '{0}' must extend '{1}'",
             Severity: spec?.Severity ?? DiagnosticSeverity.Error,
-            Predicate: (focus, _, _) => DerivesFrom(focus.Symbol, interned),
+            Predicate: (focus, _, _) => Extends(focus.Symbol, interned),
             MessageArgs: focus => EquatableArray.Create(focus.TypeFqn, interned)));
         return shape;
     }
@@ -88,7 +89,7 @@ public static class TypeArgFocusLeafPredicates
         return false;
     }
 
-    private static bool DerivesFrom(ITypeSymbol symbol, string metadataName)
+    private static bool Extends(ITypeSymbol symbol, string metadataName)
     {
         for (var current = symbol.BaseType; current is not null; current = current.BaseType)
         {

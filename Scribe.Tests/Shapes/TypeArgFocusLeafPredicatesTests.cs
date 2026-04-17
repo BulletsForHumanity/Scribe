@@ -13,7 +13,7 @@ namespace Scribe.Tests.Shapes;
 
 /// <summary>
 ///     Exercises <see cref="TypeArgFocusLeafPredicates"/> — <c>MustImplement</c> and
-///     <c>MustDeriveFrom</c> — reached via a generic type argument on an attribute
+///     <c>MustExtend</c> — reached via a generic type argument on an attribute
 ///     application.
 /// </summary>
 public class TypeArgFocusLeafPredicatesTests
@@ -59,12 +59,12 @@ public class Payload : System.IDisposable { public void Dispose() { } }
     }
 
     [Fact]
-    public void MustDeriveFrom_fires_when_type_arg_does_not_derive_from_base()
+    public void MustExtend_fires_when_type_arg_does_not_derive_from_base()
     {
         var shape = Stencil.ExposeRecord()
             .Attributes("ThingAttribute", configure: attr =>
                 attr.GenericTypeArg(index: 0, configure: arg =>
-                    arg.MustDeriveFrom("System.Exception")))
+                    arg.MustExtend("System.Exception")))
             .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"
@@ -78,12 +78,12 @@ public class Payload { }
     }
 
     [Fact]
-    public void MustDeriveFrom_is_silent_when_type_arg_derives_transitively()
+    public void MustExtend_is_silent_when_type_arg_derives_transitively()
     {
         var shape = Stencil.ExposeRecord()
             .Attributes("ThingAttribute", configure: attr =>
                 attr.GenericTypeArg(index: 0, configure: arg =>
-                    arg.MustDeriveFrom("System.Exception")))
+                    arg.MustExtend("System.Exception")))
             .Etch<Collected>((in ShapeEtchContext ctx) => new Collected(ctx.Fqn));
 
         var source = @"

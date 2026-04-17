@@ -108,8 +108,5 @@ public sealed partial class TypeShape
     }
 
     private static Location? FirstLocation(INamedTypeSymbol symbol)
-    {
-        var locations = symbol.Locations;
-        return locations.Length == 0 ? null : locations[0];
-    }
+        => DeterministicLocations.PrimaryLocation(symbol);
 }

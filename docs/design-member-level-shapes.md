@@ -208,7 +208,7 @@ Ordered by layering dependency. Each row assumes the ones above it.
      `ForEachMember` match).
 4. **Leaf predicates on non-type foci**:
    - `AttributeFocus.Exists()` (gated via min/max on the lens)
-   - `TypeArgFocus.MustImplement(fqn)`, `.MustDeriveFrom(fqn)`,
+   - `TypeArgFocus.MustImplement(fqn)`, `.MustExtend(fqn)`,
      `.MustBeParsable()`, `.MustBeSealed()` — all reusing the type-level
      predicate catalogue lifted to apply at a navigated focus.
    - `ConstructorArgFocus<T>.MustBe(value)` / `.MustSatisfy(pred)`.

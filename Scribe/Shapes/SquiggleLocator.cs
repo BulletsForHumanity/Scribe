@@ -15,14 +15,14 @@ internal static class SquiggleLocator
 {
     public static Location Resolve(INamedTypeSymbol symbol, SquiggleAt anchor, CancellationToken ct)
     {
-        var fallback = FirstLocationOrNone(symbol);
-        var refs = symbol.DeclaringSyntaxReferences;
-        if (refs.Length == 0)
+        var fallback = DeterministicLocations.PrimaryLocationOrNone(symbol);
+        var primary = DeterministicLocations.PrimaryReference(symbol);
+        if (primary is null)
         {
             return fallback;
         }
 
-        var syntax = refs[0].GetSyntax(ct);
+        var syntax = primary.GetSyntax(ct);
         if (syntax is not TypeDeclarationSyntax tds)
         {
             return fallback;
@@ -71,6 +71,4 @@ internal static class SquiggleLocator
         return null;
     }
 
-    private static Location FirstLocationOrNone(INamedTypeSymbol symbol) =>
-        symbol.Locations.Length == 0 ? Location.None : symbol.Locations[0];
 }

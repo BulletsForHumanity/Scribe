@@ -14,13 +14,13 @@ internal static class MemberSquiggleLocator
 {
     public static Location Resolve(ISymbol symbol, MemberSquiggleAt anchor, CancellationToken ct)
     {
-        var refs = symbol.DeclaringSyntaxReferences;
-        if (refs.Length == 0)
+        var primary = DeterministicLocations.PrimaryReference(symbol);
+        if (primary is null)
         {
-            return symbol.Locations.Length == 0 ? Location.None : symbol.Locations[0];
+            return DeterministicLocations.PrimaryLocationOrNone(symbol);
         }
 
-        var node = refs[0].GetSyntax(ct);
+        var node = primary.GetSyntax(ct);
         return anchor switch
         {
             MemberSquiggleAt.Identifier => IdentifierLocation(node) ?? node.GetLocation(),
