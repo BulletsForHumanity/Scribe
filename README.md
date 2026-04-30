@@ -137,7 +137,7 @@ public partial record struct Amount : IParsable<Amount>
 // I HAVE SPOKEN
 ```
 
-`global::System.IParsable` and `global::System.ArgumentException` are automatically shortened to their simple names with `using System;` added — Quill resolves all `global::` references at `Inscribe()` time.
+Because `q.Using("System")` was registered, `Inscribe()` shortens `global::System.IParsable` and `global::System.ArgumentException` to their simple names. Quill only shortens references whose namespace was explicitly registered — the [`SCRIBE300`](docs/quill-reference.md#tooling--scribe300) analyzer catches forgotten registrations.
 
 ### ScribeHeader
 

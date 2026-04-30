@@ -59,7 +59,7 @@ private static WidgetTarget? TransformWidget(GeneratorSyntaxContext ctx, Cancell
 **Key principles:**
 
 - Capture **emit flags** that encode what the user already defined — the renderer checks these to avoid generating duplicate members.
-- Use `SymbolDisplayFormat.FullyQualifiedFormat` for type names — they come out as `global::Namespace.Type`, which Quill resolves automatically.
+- Use `SymbolDisplayFormat.FullyQualifiedFormat` for type names — they come out as `global::Namespace.Type`, which Quill shortens at `Inscribe()` time when the namespace is registered via `Using()` / `Usings()`.
 - Return `null` for non-matching nodes — the pipeline's `.Where(t => t is not null)` filter handles it.
 
 ---
@@ -161,7 +161,7 @@ internal sealed class WidgetRenderer(WidgetTarget target)
 **Key principles:**
 
 - Each concern gets its own `private void Emit*(Quill q)` method.
-- Use `global::` FQNs in string content — Quill's `Inscribe()` auto-resolves them to short names with `using` directives.
+- Use `global::` FQNs in string content — register their namespaces with `q.Using()` / `q.Usings()` so `Inscribe()` shortens them to plain names. The [`SCRIBE300`](quill-reference.md#tooling--scribe300) analyzer catches forgotten registrations.
 - The renderer is easy to test: construct a target, call `Render()`, assert on the returned string.
 
 ---
@@ -170,19 +170,24 @@ internal sealed class WidgetRenderer(WidgetTarget target)
 
 ### Type References
 
-Write `global::Namespace.Type` directly in your strings. At `Inscribe()` time, Quill scans the body, adds `using` directives, and shortens the references:
+Write `global::Namespace.Type` directly in your strings, then register the namespace with `q.Using()` so `Inscribe()` shortens the reference:
 
 ```csharp
+q.Using("System");
 q.Line($"throw new global::System.ArgumentException(\"bad\");");
 // Output: throw new ArgumentException("bad");
-// Added:  using System;
+//         using System;     ← from the explicit q.Using("System")
 ```
 
-When two types share the same short name, Quill creates disambiguated aliases:
+Without a registered using the `global::` reference is left verbatim — Quill does not auto-discover namespaces from the body. The [`SCRIBE300`](quill-reference.md#tooling--scribe300) analyzer flags forgotten registrations at edit time.
+
+When two types share the same short name, register each with `q.Alias` to disambiguate:
 
 ```csharp
-q.Line($"global::Foo.Widget a = default;");
-q.Line($"global::Bar.Widget b = default;");
+var fw = q.Alias("Foo", "Widget");   // returns "FooWidget"
+var bw = q.Alias("Bar", "Widget");   // returns "BarWidget"
+q.Line($"{fw} a = default;");
+q.Line($"{bw} b = default;");
 // Output:
 // using FooWidget = Foo.Widget;
 // using BarWidget = Bar.Widget;
@@ -196,6 +201,8 @@ For static member access (`StringComparer.Ordinal`), use `Using()` + short names
 q.Using("System");
 q.Line("var cmp = StringComparer.Ordinal;");
 ```
+
+**Tooling.** Quill only shortens `global::` references whose namespace was explicitly registered. The `SCRIBE300` analyzer (in `Scribe.Ink`, severity `Info`) catches mismatches at edit time and offers a code fix to insert the missing `q.Using("...")`. See [Quill Reference — Tooling](quill-reference.md#tooling--scribe300).
 
 ### XML Documentation
 

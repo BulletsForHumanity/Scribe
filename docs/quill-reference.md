@@ -49,24 +49,44 @@ Add multiple using directives at once.
 q.Usings("System", "System.Linq", "System.Collections.Generic");
 ```
 
-### Automatic `global::` Resolution
+### `global::` Resolution
 
-Any `global::Namespace.Type` reference in the body content is automatically resolved at `Inscribe()` time:
-
-- If the short name is unique, Quill adds `using Namespace;` and replaces `global::Namespace.Type` with `Type`.
-- If two types share the same short name, Quill creates disambiguated `using` aliases (e.g. `using FooWidget = Foo.Widget;`).
+At `Inscribe()` time, Quill walks the body and shortens every `global::Ns.Type` reference whose `Ns` was registered via [`Using`](#usingstring-ns) or [`Usings`](#usingsparams-string-namespaces). Unregistered references are left verbatim — Quill does not auto-discover namespaces from the body. Resolution is just a string replace of `"global::" + ns + "."` with `""` per registered namespace, longest-prefix-first.
 
 ```csharp
+q.Using("System");
 q.Line("var x = new global::System.ArgumentException(\"bad\");");
 // After Inscribe():  var x = new ArgumentException("bad");
-// Added:             using System;
+//                    using System;        ← from the explicit q.Using("System")
 ```
 
-**Static member access:** `global::` resolution treats the last dotted segment as the type name. For patterns like `StringComparer.Ordinal`, use `Using()` + short names instead:
+```csharp
+// No q.Using("Foo.Bar") — Quill leaves the reference as-is.
+q.Line("global::Foo.Bar.Widget w = default;");
+// After Inscribe():  global::Foo.Bar.Widget w = default;
+```
+
+**Same-short-name disambiguation requires explicit `Alias`.** When two types share the same short name, register each with [`Alias`](#aliasstring-ns-string-typename) — Quill emits the `using AliasName = Ns.Type;` directives and substitutes the alias name. There is no automatic conflict detection.
+
+**Static member access:** resolution treats the last dotted segment as the type name. For patterns like `StringComparer.Ordinal`, register the parent namespace and use the short name directly:
 
 ```csharp
 q.Using("System");
 q.Line("var cmp = StringComparer.Ordinal;");
+```
+
+The [`SCRIBE300`](#tooling--scribe300) analyzer catches forgotten `Using` registrations at edit time.
+
+### Tooling — SCRIBE300
+
+`Scribe.Ink` ships an analyzer (`SCRIBE300`, severity `Info`) that flags `global::Ns.Type` references emitted into a Quill builder when no `Using(...)` registration on the same containing type covers `Ns`. It scans every string-accepting Quill content method (`Line`, `Lines`, `AppendRaw`, `Comment`, `Header`, `Block`, `SwitchExpr`, `Case`, `Region`, `ListInit`, `Summary`, `Remarks`, `Param`, `Returns`) and the `BlockScope` post-decoration methods (`Attribute`, `Exception`, `SeeAlso`, etc.).
+
+Scope is per containing `INamedTypeSymbol` — a Quill that flows from a `new Quill()` site through helper methods on the same type is fully covered. Types that only receive a Quill from outside (no local construction site) are skipped to avoid false positives. A code fix is offered when an existing `Using(...)` / `Usings(...)` call site exists in the same type; it inserts a sibling `q.Using("...")` statement next to it.
+
+```csharp
+var q = new Quill();
+q.Using("System.Text");
+q.Line("var x = global::Foo.Bar.Baz();");   // SCRIBE300: 'global::Foo.Bar.Baz' is not covered — add q.Using("Foo.Bar")
 ```
 
 ### `Alias(string ns, string typeName)`

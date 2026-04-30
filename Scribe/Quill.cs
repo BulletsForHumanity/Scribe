@@ -202,10 +202,12 @@ public sealed partial class Quill()
     ///     Produces the final source text. Prepends the <c>// &lt;auto-generated/&gt;</c> header,
     ///     sorted usings, and file-scoped namespace before the body content.
     ///     <para>
-    ///         As a post-processing step, all <c>global::</c> type references in the body are resolved:
-    ///         non-conflicting types get a <c>using</c> directive and are shortened to their simple name;
-    ///         conflicting types (same short name, different namespace) receive disambiguated
-    ///         <c>using</c> aliases built from their namespace segments.
+    ///         As a post-processing step, every <c>global::Ns.Type</c> reference in the body whose
+    ///         <c>Ns</c> was registered via <see cref="Using"/> or <see cref="Usings"/> is shortened
+    ///         (longest-prefix-first). Unregistered <c>global::</c> references are left verbatim —
+    ///         Quill does not auto-discover namespaces from the body. Disambiguation between two
+    ///         types with the same short name requires explicit <see cref="Alias(string, string)"/>
+    ///         calls; there is no automatic conflict detection.
     ///     </para>
     ///     <para>
     ///         If a <see cref="ScribeHeaderAttribute"/> was discovered (or set via <see cref="Header"/>),

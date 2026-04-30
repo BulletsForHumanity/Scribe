@@ -67,6 +67,7 @@ My purpose here is singular: to bring Scribe into the world in its highest possi
 | **ScribeHeader** | Assembly-level attribute (`[assembly: ScribeHeader("...")]`) that brands generated files with a decorative page header. Quill auto-discovers it via `GetCallingAssembly()`. |
 | **Stubs** | netstandard2.0 polyfill types (`init`, `record`, `required`, nullable annotations) guarded by `#if !NET5_0_OR_GREATER`. |
 | **LocalDev** | Build infrastructure (MSBuild props/targets) for multi-repo local NuGet package development. Auto-packs, generates version overrides, registers local package sources. |
+| **QuillUsingsAnalyzer** | `Scribe.Ink` analyzer (`SCRIBE300`, `Info`) that flags `global::Ns.Type` references emitted into a Quill when no `Using(Ns)` registration on the same containing type covers them. Includes a code fix that inserts a sibling `q.Using("...")` statement. See `docs/design-quill-using-analyzer.md`. |
 
 ---
 
