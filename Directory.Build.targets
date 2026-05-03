@@ -2,27 +2,11 @@
   <!-- This file stops MSBuild from walking up to parent directories. -->
 
   <!-- ── Scribe LocalDev targets (direct import — Scribe can't get this from its own NuGet) ── -->
+  <!-- Scribe.LocalDev.targets owns local-pack version stamping (the
+       _ScribeLocalDevStampVersion target). When it activates — sentinel-driven
+       producer mode OR Meta auto-pack — every local pack is anchored to
+       '{base}-dev.yyyyMMdd-HHmmss-fff' so consumers always resolve to the
+       freshest bits without cache clears, with or without NBGV in play. -->
   <Import Project="$(MSBuildThisFileDirectory)Scribe\build\Scribe.LocalDev.targets"
           Condition="Exists('$(MSBuildThisFileDirectory)Scribe\build\Scribe.LocalDev.targets')" />
-
-  <!-- ── Local Scribe: timestamp-based dev version suffix ──────────────
-       Replace NBGV's default git-hash suffix (e.g. -g1234abcd) with a
-       timestamp suffix (-dev.yyyyMMddHHmmss) so that each local build
-       produces a strictly increasing version. NuGet caches by version
-       string, so timestamps ensure consumers always restore the latest
-       local build without needing cache clears. -->
-  <Target
-    Name="_ScribeLocalDevTimestampVersion"
-    AfterTargets="GetBuildVersion"
-    BeforeTargets="Build;Pack;GenerateNuspec"
-    Condition="'$(IsLocalProducer)' == 'true' and '$(IsPackable)' != 'false'"
-  >
-    <PropertyGroup>
-      <_DevTimestamp>$([System.DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff"))</_DevTimestamp>
-      <_BaseVersion>$([System.Text.RegularExpressions.Regex]::Replace($(NuGetPackageVersion), '-.*$', ''))</_BaseVersion>
-      <_BaseVersion Condition="'$(_BaseVersion)' == ''">$(VersionPrefix)</_BaseVersion>
-      <NuGetPackageVersion>$(_BaseVersion)-dev.$(_DevTimestamp)</NuGetPackageVersion>
-      <PackageVersion>$(NuGetPackageVersion)</PackageVersion>
-    </PropertyGroup>
-  </Target>
 </Project>

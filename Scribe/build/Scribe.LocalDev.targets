@@ -65,6 +65,74 @@
                and Exists('$(ScribeArtifactsDir)')"
   />
 
+  <!-- ── Local Pack Version Stamping ─────────────────────────────────── -->
+  <!--
+      Append a unique '-dev.{stamp}' suffix to the package version on every
+      local pack (sentinel-driven producer mode OR Meta auto-pack). NuGet
+      caches by version string, so without a fresh stamp every time, an
+      in-place rebuild whose version is unchanged (NBGV's commit hash for
+      committed-with-no-changes, or the bare default 1.0.0 when NBGV isn't
+      in play) would silently serve stale cached bits to consumers.
+
+      Format: '{SemVer}-dev.yyyyMMdd-HHmmss-fff' (UTC, millisecond precision).
+      The stamp dashes are cosmetic — two builds in the same second still
+      differ on the trailing milliseconds.
+
+      Any pre-existing prerelease suffix (e.g. NBGV's '-g{hash}', or
+      '-pre+meta') is stripped before re-attaching '-dev.{stamp}' so the
+      version stays a clean {Major.Minor.Patch}-dev.{stamp} regardless of
+      where the base version came from. NBGV is supported but not required
+      — without NBGV the base is the project's $(VersionPrefix) (default
+      '1.0.0').
+
+      Runs BEFORE _GenerateNuspec (Pack reads $(PackageVersion) there) and
+      before the override-file emitters in this same .targets file plus
+      Scribe.Sdk's _ScribeSdkMetaOverride. The override emitter's
+      $(NuGetPackageVersion) is set by NuGet from $(PackageVersion), so
+      updating $(PackageVersion) here ensures the override file pins the
+      same timestamped version the nupkg was built with.
+
+      Idempotent: re-entry that sees a '-dev.' suffix already in place
+      is a no-op (guarded via the target Condition).
+  -->
+  <!-- No _ScribeLocalDevTargetsSkip check here: when this file is imported via
+       both Sdk.targets and Directory.Build.targets, MSBuild emits "Overriding
+       target ..." — the second declaration replaces the first. Both copies have
+       identical content, so a single execution of the surviving copy is correct
+       and sufficient. (The skip flag exists to silence duplicate output from
+       PropertyGroups, not to neutralise targets.) -->
+  <Target
+    Name="_ScribeLocalDevStampVersion"
+    AfterTargets="GetBuildVersion"
+    BeforeTargets="Build;GenerateNuspec;Pack;_ScribeLocalDevOverride;_ScribeSdkMetaOverride"
+    Condition="'$(_ScribeAutoStampVersion)' == 'true'
+               and '$(IsPackable)' != 'false'
+               and !$(NuGetPackageVersion.Contains('-dev.'))
+               and !$(PackageVersion.Contains('-dev.'))"
+  >
+    <PropertyGroup>
+      <_ScribeDevStamp>$([System.DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff"))</_ScribeDevStamp>
+      <!-- Strip any pre-existing prerelease suffix (NBGV '-g{hash}',
+           '-pre+meta', anything dash-led) so the result is always
+           {Major.Minor.Patch}-dev.{stamp}. Use NuGetPackageVersion as the
+           source of truth (NBGV sets it in GetBuildVersion); fall back to
+           PackageVersion or VersionPrefix when NBGV isn't in play. -->
+      <_ScribeBaseVersion>$([System.Text.RegularExpressions.Regex]::Replace($(NuGetPackageVersion), '-.*$', ''))</_ScribeBaseVersion>
+      <_ScribeBaseVersion Condition="'$(_ScribeBaseVersion)' == ''">$([System.Text.RegularExpressions.Regex]::Replace($(PackageVersion), '-.*$', ''))</_ScribeBaseVersion>
+      <_ScribeBaseVersion Condition="'$(_ScribeBaseVersion)' == ''">$(VersionPrefix)</_ScribeBaseVersion>
+      <!-- Update every consumer of "the package's version": NuGetPackageVersion
+           feeds the override-file emitter, PackageVersion feeds Pack's nuspec,
+           Version feeds AssemblyInfo / SemVer comparisons. All must agree. -->
+      <NuGetPackageVersion>$(_ScribeBaseVersion)-dev.$(_ScribeDevStamp)</NuGetPackageVersion>
+      <PackageVersion>$(NuGetPackageVersion)</PackageVersion>
+      <Version>$(NuGetPackageVersion)</Version>
+    </PropertyGroup>
+    <Message
+      Text="[Scribe] Stamped local pack version → $(NuGetPackageVersion)"
+      Importance="high"
+    />
+  </Target>
+
   <!-- ── Override File Generation (producer mode) ──────────────────────── -->
   <!--
       Runs after Pack on every packable project in the producer set. Each

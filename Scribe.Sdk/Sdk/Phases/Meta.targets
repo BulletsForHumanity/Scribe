@@ -69,13 +69,18 @@
        dir so consumers resolve the freshest build via VersionOverride. No
        sentinel is required — Meta is always "in local mode" when Debug and
        $(ScribeRoot) is set. IsLocalScribe is forced so LocalDev.targets'
-       consumer-side wildcard import picks up this override file too. -->
+       consumer-side wildcard import picks up this override file too.
+       _ScribeAutoStampVersion is flipped on so _ScribeLocalDevStampVersion
+       (in Scribe.LocalDev.targets) appends a fresh '-dev.{stamp}' suffix
+       before pack — without it, NuGet would cache the unchanged version
+       string and serve stale bits to in-solution consumers. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'
                             and '$(IsPackable)' == 'true'
                             and '$(ScribePackagesDir)' != ''">
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageOutputPath>$(ScribePackagesDir)</PackageOutputPath>
     <IsLocalScribe Condition="'$(IsLocalScribe)' != 'true'">true</IsLocalScribe>
+    <_ScribeAutoStampVersion>true</_ScribeAutoStampVersion>
   </PropertyGroup>
 
   <!-- Register the shared packages directory as a NuGet source so restore finds

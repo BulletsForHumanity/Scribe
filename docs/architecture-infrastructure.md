@@ -318,12 +318,23 @@ The framework's own NuGet auto-import files (`build/Framework.props` and `.targe
 
 ## Version Suffixing
 
-Local builds use timestamp-based dev version suffixes (e.g. `0.2.12-dev.20260405120000`). This is handled outside of Scribe — typically by a target in the producer's `Directory.Build.targets` that strips any NBGV git-hash suffix and replaces it with `-dev.yyyyMMddHHmmss`. The timestamp ensures:
+Every local pack appends a unique `-dev.{stamp}` suffix where `{stamp}` is `yyyyMMddHHmmssfff` (UTC, millisecond precision). Without this, NuGet's content-addressable cache would serve stale bits any time the consumer's `Version` string didn't change between builds — which is the common case both with NBGV (commit-hash unchanged when working in-place) and without NBGV (everyone shares the default `1.0.0`).
 
-- Versions are unique per build
+Implementation lives in `Scribe.LocalDev.targets` as the `_ScribeLocalDevStampVersion` target. It runs before `Pack`, `GenerateNuspec`, and the override-file emitters in this same file plus `Scribe.Sdk`'s `_ScribeSdkMetaOverride`. The target fires when `_ScribeAutoStampVersion=true`, set automatically by:
+
+- **`Scribe.LocalDev.props`** when the `.{ScribesName}.scribe` sentinel marks the project as `IsLocalProducer=true` (Library / Companion / standalone Analyzer producer-mode pack).
+- **`Scribe.Sdk/Sdk/Phases/Meta.targets`** unconditionally for Debug auto-pack (Meta is local-only by design — every Meta build is a local pack).
+
+The stamp is idempotent: re-evaluation that already saw a `-dev.` suffix won't double-stamp. It composes cleanly with NBGV — `0.5.9-g{hash}` becomes `0.5.9-g{hash}-dev.{stamp}`. Without NBGV the bare `1.0.0` becomes `1.0.0-dev.{stamp}`. **Scribe is NBGV-friendly, not NBGV-dependent** — pulling Scribe.Sdk into a project that doesn't use NBGV is fully supported; you'll just see versions anchored at `1.0.0-dev.*` instead of `{nbgv}-dev.*`.
+
+The stamp ensures:
+
+- Versions are unique per build (millisecond-precision so two builds in the same second still differ)
 - Versions sort chronologically
 - Versions are human-readable
 - No collision with published NuGet versions
+
+Consumers (still typical Mish-style projects) need NOT add their own version-suffix target. If you have one inherited from older Scribe versions, you can delete it; the per-pack stamp now lives where it belongs — next to the pack itself.
 
 ---
 
