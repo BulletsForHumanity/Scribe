@@ -41,14 +41,24 @@
 
       ── Provides ─────────────────────────────────────────────────────────
 
-        $(IsLocalScribe)       'true' when any local sentinel is active
-                               (umbrella flag — governs consumer-side infra).
-        $(IsLocalProducer)     'true' when THIS project's '.$(ScribesName).scribe'
-                               sentinel exists (applies to every project in
-                               the set — governs auto-pack and override-file
-                               emission).
-        $(ScribeArtifactsDir)  $(ScribeRoot)\.artifacts\
-        $(ScribePackagesDir)   $(ScribeArtifactsDir)packages\
+        $(IsLocalScribe)            'true' when any local sentinel is active
+                                    (umbrella flag — governs consumer-side infra).
+        $(IsLocalProducer)          'true' when THIS project's '.$(ScribesName).scribe'
+                                    sentinel exists (applies to every project in
+                                    the set — governs auto-pack and override-file
+                                    emission).
+        $(_ScribeAutoStampVersion)  'true' when this build should append a unique
+                                    '-dev.{stamp}' suffix to its version before pack
+                                    (set automatically for IsLocalProducer=true
+                                    and for Meta auto-pack). The stamp is what
+                                    makes consecutive local rebuilds resolvable —
+                                    NuGet caches by version, so without a unique
+                                    stamp, a code edit that doesn't bump NBGV's
+                                    commit hash silently serves stale cached bits.
+                                    See the _ScribeLocalDevStampVersion target in
+                                    Scribe.LocalDev.targets.
+        $(ScribeArtifactsDir)       $(ScribeRoot)\.artifacts\
+        $(ScribePackagesDir)        $(ScribeArtifactsDir)packages\
 
       ── Override Files ───────────────────────────────────────────────────
 
@@ -159,6 +169,12 @@
   >
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageOutputPath>$(ScribePackagesDir)</PackageOutputPath>
+    <!-- Each local pack must produce a fresh version. Without this every
+         in-place rebuild that doesn't change NBGV's commit hash (or any build
+         from a project that doesn't use NBGV at all) would emit the same
+         version string, NuGet would cache it, and the consumer would get
+         stale generators / analyzers. See _ScribeLocalDevStampVersion. -->
+    <_ScribeAutoStampVersion>true</_ScribeAutoStampVersion>
   </PropertyGroup>
 
   <!-- NOTE: Per-PackageId override files ($(PackageId).Directory.Packages.targets)
