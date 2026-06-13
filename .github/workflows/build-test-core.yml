@@ -76,8 +76,47 @@ jobs:
       - name: Build
         run: dotnet build Scribe.slnx --configuration Release --no-restore
 
+      # Microsoft.Testing.Platform: tests are self-hosting executables driven by the MTP
+      # `dotnet test` (opted in via global.json `test.runner`). xUnit's built-in reporter
+      # emits CTRF test results (no extra package); the CodeCoverage extension emits
+      # Cobertura. Both are rendered below; the report steps run on always() so a test
+      # failure still publishes results while the Test step's exit code fails the job.
       - name: Test
-        run: dotnet test Scribe.slnx --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+        run: >-
+          dotnet test --solution Scribe.slnx --configuration Release --no-build --verbosity normal
+          --
+          --report-ctrf --report-ctrf-filename test-results.ctrf.json
+          --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+
+      - name: Publish test report
+        if: always()
+        continue-on-error: true
+        uses: ctrf-io/github-test-reporter@v1
+        with:
+          report-path: '**/test-results.ctrf.json'
+
+      - name: Generate coverage report
+        if: always()
+        continue-on-error: true
+        uses: danielpalme/ReportGenerator-GitHub-Action@5
+        with:
+          reports: '**/coverage.cobertura.xml'
+          targetdir: coveragereport
+          reporttypes: MarkdownSummaryGithub;Html
+
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ -f coveragereport/SummaryGithub.md ]; then
+            cat coveragereport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coveragereport
 
       - name: Pack core packages
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -85,13 +124,6 @@ jobs:
           dotnet pack Scribe/Scribe.csproj             --configuration Release --no-build --output .artifacts/packages
           dotnet pack Scribe.Ink/Scribe.Ink.csproj     --configuration Release --no-build --output .artifacts/packages
           dotnet pack Scribe.Scriptorium/Scribe.Scriptorium.csproj --configuration Release --no-build --output .artifacts/packages
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-core
-          path: "**/test-results.trx"
 
       - name: Upload packages
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

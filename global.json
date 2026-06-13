@@ -5,6 +5,9 @@
     "allowPrerelease": false
   },
   "msbuild-sdks": {
-    "BulletsForHumanity.Scribe.Sdk": "0.6.4"
+    "BulletsForHumanity.Scribe.Sdk": "0.6.6"
+  },
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
   }
 }
