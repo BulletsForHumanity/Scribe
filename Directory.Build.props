@@ -12,6 +12,8 @@
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
+    <!-- Microsoft.Testing.Platform test projects are executables (they host the in-proc runner). -->
+    <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\Scribe\Scribe.csproj" />
     <ProjectReference Include="..\Scribe.Ink\Scribe.Ink.csproj" />
@@ -7,9 +7,30 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="Shouldly" />
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
+
+  <!--
+    Microsoft.CodeAnalysis.CSharp 5.x (netstandard2.0) transitively pulls in the netstandard2.0
+    builds of several system libraries (System.Threading.Tasks.Extensions, System.Collections.Immutable,
+    System.Memory, …). The .NET 10 framework also provides 10.x versions, so any type present in both
+    — e.g. ValueTask, used by xUnit's ITestPipelineStartup in OutputDirectoryAssemblyResolver — raises a
+    CS0433 ambiguous-type error. All listed assemblies are binary-compatible and the framework copy wins at
+    runtime. Strip the .nuget-cached netstandard2.0 copies from ReferencePath, keeping the framework copies.
+    (Same workaround as Hermetic.Logos.Tests.)
+  -->
+  <PropertyGroup>
+    <_AmbiguousNetStandardSystemRefs>;System.Buffers.dll;System.Collections.Immutable.dll;System.Memory.dll;System.Numerics.Vectors.dll;System.Reflection.Metadata.dll;System.Runtime.CompilerServices.Unsafe.dll;System.Text.Encoding.CodePages.dll;System.Threading.Tasks.Extensions.dll;</_AmbiguousNetStandardSystemRefs>
+  </PropertyGroup>
+  <Target Name="RemoveAmbiguousNetStandardSystemRefs" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <ReferencePath
+        Remove="@(ReferencePath)"
+        Condition="$(_AmbiguousNetStandardSystemRefs.Contains(';%(FileName)%(Extension);'))
+                                and $([System.String]::Copy('%(Identity)').Contains('.nuget'))"
+      />
+    </ItemGroup>
+  </Target>
 </Project>
